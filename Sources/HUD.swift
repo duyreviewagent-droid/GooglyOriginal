@@ -65,6 +65,7 @@ final class HUD {
     private let board = SKNode()
     private let scoreBox = SKNode()
     private let scoreLabel = lbl("0", size: 34, color: hex(0xffd84a))
+    private let scoreTitle = lbl("TEAM SCORE", size: 11, color: NSColor(white: 1, alpha: 0.7), font: uiFontMed)
     private let levelLabel = lbl("", size: 13, color: NSColor(white: 1, alpha: 0.75), font: uiFontMed)
     private let help = lbl("", size: 14, color: NSColor(white: 1, alpha: 0.8), font: uiFontMed)
     private let saved = lbl("SAVED ✓", size: 16, color: hex(0x9dff8a))
@@ -104,9 +105,8 @@ final class HUD {
         toastNode.zPosition = 30
         saved.alpha = 0
         scoreBox.addChild(roundRect(220, 74, fill: NSColor(white: 0, alpha: 0.55), stroke: hex(0xffd84a, 0.5), line: 1.5))
-        let sc = lbl("TEAM SCORE", size: 11, color: NSColor(white: 1, alpha: 0.7), font: uiFontMed)
-        sc.position = CGPoint(x: 0, y: 22)
-        scoreBox.addChild(sc)
+        scoreTitle.position = CGPoint(x: 0, y: 22)
+        scoreBox.addChild(scoreTitle)
         scoreLabel.position = CGPoint(x: 0, y: -2)
         scoreBox.addChild(scoreLabel)
         levelLabel.position = CGPoint(x: 0, y: -26)
@@ -179,11 +179,12 @@ final class HUD {
             scoreLabel.run(.sequence([.scale(to: 1.12, duration: 0.05), .scale(to: 1, duration: 0.1)]))
         }
         levelLabel.text = g.level.name.uppercased()
+        scoreTitle.text = g.slots.count > 1 ? "TEAM SCORE" : "SCORE"
         if g.state == .playing { helpTime += dt }
         let hk = g.slots.map { $0.scheme.controlsHint }.joined(separator: "   |   ")
         if hk != helpKey {
             helpKey = hk
-            help.text = g.slots.count == 1 ? hk + " · scroll zoom · Esc pause" : hk
+            help.text = g.slots.count == 1 ? hk.replacingOccurrences(of: " · T teleport", with: "") + " · scroll zoom · Esc pause" : hk
             help.fontSize = g.slots.count > 2 ? 11 : 14
             help.setScale(1)
             help.setScale(min(1, (size.width - 40) / max(1, help.frame.width)))
@@ -498,7 +499,7 @@ final class HUD {
         let coop = lbl("COUCH CO-OP (optional): friends on this Mac press their jump key to join · SPACE · / · Ⓐ", size: 14,
                        color: NSColor(white: 1, alpha: 0.9), font: uiFontMed)
         coop.position = CGPoint(x: 0, y: -size.height * 0.06 + 96)
-        let cb = roundRect(coop.frame.width + 36, 30, r: 15, fill: NSColor(white: 0, alpha: 0.5))
+        let cb = roundRect(coop.frame.width + 36, 32, r: 16, fill: NSColor(white: 0, alpha: 0.72))
         cb.position = coop.position
         title.addChild(cb)
         title.addChild(coop)

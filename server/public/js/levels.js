@@ -83,7 +83,7 @@ export class LevelData {
 
 const THEMES = {
   backyard: { skyTop: 0x5fb8ff, skyBottom: 0xd8f1ff, ground: 0x8a5a36, groundEdge: 0x5a3820, groundTop: 0x5cc94a, platform: 0xb07a48,
-    platformTop: 0x74d65e, hillFar: 0x9fd9a0, hillNear: 0x6cc070, decor: ['tree', 'flower-pink', 'flower-sun', 'flower-white', 'mushroom', 'bush', 'rock'].map(k => k),
+    platformTop: 0x74d65e, hillFar: 0x9fd9a0, hillNear: 0x6cc070,
     decorOrder: ['flower-pink', 'flower-sun', 'flower-white', 'mushroom', 'tree', 'bush', 'rock'],
     music: 0, topTex: 'grass', sideTex: 'dirt', platTopTex: 'grass', platSideTex: 'wood', props: 0 },
   desert: { skyTop: 0xff9d5c, skyBottom: 0xffe6a6, ground: 0xd9a35f, groundEdge: 0x9a6a33, groundTop: 0xf2c77e, platform: 0xb9854a,
