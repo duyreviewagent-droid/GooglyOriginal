@@ -23,6 +23,9 @@ final class Net: NSObject, URLSessionWebSocketDelegate {
     var secondsConnecting: Double { Date().timeIntervalSince(started) }
     private(set) var rtt: Double = 0
     private var pingTimer: Timer?
+    private var everOpened = false
+    private var attempts = 0
+    private var closedByUs = false
     var bytesOut = 0, bytesIn = 0
 
     init(server: String = Net.defaultServer) {
@@ -50,6 +53,7 @@ final class Net: NSObject, URLSessionWebSocketDelegate {
     private func setStatus(_ s: Status) { lock.lock(); _status = s; lock.unlock() }
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
+        everOpened = true
         setStatus(.open)
         let name = Net.playerName
         send(["t": "hello", "name": name])
@@ -62,16 +66,46 @@ final class Net: NSObject, URLSessionWebSocketDelegate {
     }
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-        setStatus(.closed("connection closed"))
+        if webSocketTask === task { failed("connection closed") }
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if let e = error { setStatus(.closed(e.localizedDescription)) }
+        guard let e = error, task === self.task else { return }
+        failed(e.localizedDescription)
+    }
+
+    /// Before the first successful connection, keep retrying (the free server may be waking up or
+    /// its edge may bounce a handshake); after that, a drop really is a disconnect.
+    private func failed(_ why: String) {
+        if closedByUs { return }
+        if !everOpened && attempts < 40 {
+            attempts += 1
+            setStatus(.connecting)
+            task?.cancel()
+            task = nil
+            DispatchQueue.global().asyncAfter(deadline: .now() + min(3, 0.6 + Double(attempts) * 0.3)) { [weak self] in
+                guard let self = self, !self.closedByUs else { return }
+                self.reconnect()
+            }
+        } else {
+            setStatus(.closed(why))
+        }
+    }
+
+    private func reconnect() {
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 90
+        let t = session.webSocketTask(with: req)
+        t.maximumMessageSize = 1 << 20
+        task = t
+        t.resume()
+        receive()
     }
 
     private func receive() {
-        task?.receive { [weak self] result in
-            guard let self = self else { return }
+        let current = task
+        current?.receive { [weak self] result in
+            guard let self = self, current === self.task else { return }
             switch result {
             case .success(let msg):
                 var data: Data?
@@ -92,7 +126,7 @@ final class Net: NSObject, URLSessionWebSocketDelegate {
                 }
                 self.receive()
             case .failure(let e):
-                self.setStatus(.closed(e.localizedDescription))
+                self.failed(e.localizedDescription)
             }
         }
     }
@@ -111,6 +145,7 @@ final class Net: NSObject, URLSessionWebSocketDelegate {
     }
 
     func close() {
+        closedByUs = true
         send(["t": "leave"])
         DispatchQueue.main.async { self.pingTimer?.invalidate() }
         task?.cancel(with: .normalClosure, reason: nil)
