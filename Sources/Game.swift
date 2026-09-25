@@ -483,7 +483,7 @@ final class Game: NSObject, SCNSceneRendererDelegate {
         if input.wasPressed(Key.o) { openOnline(); return }
         // joining
         for sc in freeSchemes() where Devices.joinPressed(sc, input: input, pads: pads) {
-            if let s = join(sc) { s.body.shove(V3(0, 700, 0)); titleCountdown = slots.count >= 4 ? 1.5 : 4 }
+            if let s = join(sc) { s.body.shove(V3(0, 700, 0)); titleCountdown = slots.count >= 4 ? 1.5 : slots.count == 1 ? 3 : 4 }
         }
         let bodies = slots.isEmpty ? [titleBody] : slots.map { $0.body }
         for (i, b) in bodies.enumerated() {

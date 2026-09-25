@@ -480,7 +480,9 @@ final class HUD {
         let by = lbl("a game by Vincent" + (save.wins > 0 ? "  ·  🏆 × \(save.wins)" : ""), size: 13, color: NSColor(white: 1, alpha: 0.8), font: uiFontMed)
         by.position = CGPoint(x: 0, y: -size.height / 2 + 22)
         title.addChild(by)
-        var pills: [SKNode] = [keyPill("ENTER", "start now"), keyPill("O", "play online", color: hex(0x7a3fd1))]
+        let solo = keyPill("ENTER", "PLAY SOLO")
+        solo.setScale(1.25)
+        var pills: [SKNode] = [solo, keyPill("O", "play online", color: hex(0x7a3fd1))]
         if let r = save.run { pills.append(keyPill("C", "continue · \(LevelData.names[r.level])", color: hex(0x2b5fb8))) }
         if save.unlocked > 1 { pills.append(keyPill("1–\(save.unlocked)", "pick a level", color: hex(0x2b2f3a))) }
         pills.append(keyPill("M", "mute", color: hex(0x2b2f3a)))
@@ -489,11 +491,18 @@ final class HUD {
         var x = -tw / 2
         for p in pills {
             let w = p.calculateAccumulatedFrame().width
-            p.position = CGPoint(x: x + w / 2, y: -size.height / 2 + 76)
+            p.position = CGPoint(x: x + w / 2, y: -size.height / 2 + 84)
             x += w + gap
             title.addChild(p)
         }
-        titlePills = pills
+        let coop = lbl("COUCH CO-OP (optional): friends on this Mac press their jump key to join · SPACE · / · Ⓐ", size: 14,
+                       color: NSColor(white: 1, alpha: 0.9), font: uiFontMed)
+        coop.position = CGPoint(x: 0, y: -size.height * 0.06 + 96)
+        let cb = roundRect(coop.frame.width + 36, 30, r: 15, fill: NSColor(white: 0, alpha: 0.5))
+        cb.position = coop.position
+        title.addChild(cb)
+        title.addChild(coop)
+        titlePills = pills + [coop, cb]
         joinKey = ""
     }
 
@@ -628,7 +637,7 @@ final class HUD {
                 p.position = CGPoint(x: CGFloat(k - 1) * 240, y: -86)
                 b.addChild(p)
             }
-            let go = keyPill("ENTER", "start the game")
+            let go = keyPill("ENTER", slots.count <= 1 ? "start — solo is fine" : "start with \(slots.count) players")
             go.position = CGPoint(x: 0, y: -h / 2 + 40)
             b.addChild(go)
         } else {
@@ -705,7 +714,9 @@ final class HUD {
         }
         countdown.removeAllChildren()
         if let left = countdownLeft {
-            let t = lbl("STARTING IN \(Int(ceilf(left)))…  friends: press jump to join", size: 20, color: hex(0xffd84a))
+            let n = Int(ceilf(left))
+            let t = lbl(g.slots.count <= 1 ? "PLAYING SOLO IN \(n)…  (ENTER = go now · friends press jump to join)" : "\(g.slots.count) PLAYERS · STARTING IN \(n)…  (ENTER = go now)",
+                        size: 20, color: hex(0xffd84a))
             countdown.addChild(roundRect(t.frame.width + 50, 46, r: 23, fill: NSColor(white: 0, alpha: 0.6), stroke: hex(0xffd84a, 0.6), line: 1.5))
             countdown.addChild(t)
         }

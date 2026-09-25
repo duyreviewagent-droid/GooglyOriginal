@@ -30,8 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         if args.contains("--autotest") { view.delegate = nil; view.isPlaying = false; exit(game.autotest() ? 0 : 1) }
         if shot != nil {
-            view.inputEnabled = false
-            game.ignoreInput = true
+            let pressing = arg("--press") != nil
+            view.inputEnabled = pressing
+            game.ignoreInput = !pressing
             window.orderFrontRegardless()
         } else {
             window.makeKeyAndOrderFront(nil)
@@ -76,6 +77,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             g.later { g.autoHost = true; g.autoCodeFile = f; g.autoPlayers = n; g.openOnline() }
         }
         if let f = arg("--online-join") { g.later { g.autoJoinFile = f; g.openOnline() } }
+        // --press space@2,return@5 : simulated key presses for testing menus
+        if let spec = arg("--press") {
+            let names: [String: UInt16] = ["space": 49, "return": 36, "o": 31, "h": 4, "j": 38, "esc": 53, "c": 8, "1": 18]
+            for part in spec.split(separator: ",") {
+                let kv = part.split(separator: "@")
+                guard kv.count == 2, let k = names[String(kv[0])], let t = Double(kv[1]) else { continue }
+                DispatchQueue.main.asyncAfter(deadline: .now() + t) { self.view.input.down(k) }
+                DispatchQueue.main.asyncAfter(deadline: .now() + t + 0.12) { self.view.input.up(k) }
+            }
+        }
         if a.contains("--pause") { DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { g.later { g.state = .paused; g.hud.showPause() } } }
         if let path = arg("--shot") {
             let delay = Double(arg("--delay") ?? "4") ?? 4
