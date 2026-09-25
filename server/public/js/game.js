@@ -191,7 +191,7 @@ export class Game {
     this.state = 'playing';
     this.loadLevel(i);
     if (this.role === 'host') { this.net?.send({ t: 'start', level: i }); this.evOut = []; }
-    this.titleMode = 'main';
+    this.titleMode = 'main'; this.titleCountdown = null;
     this.hud.hideTitle(); this.hud.hidePanel();
     this.hud.banner(this.level.subtitle.toUpperCase() + (this.multi ? ` · ${this.slots.length} PLAYERS` : ''), this.level.name);
     this.audio.play('checkpoint', 0.5);
@@ -217,6 +217,7 @@ export class Game {
     this.hud.flashSaved();
   }
   toTitle() {
+    this.titleCountdown = null;
     if (this.net && this.state !== 'title') { this.net.close(); this.net = null; this.role = 'offline'; }
     this.titleMode = 'main'; this.menuOpen = false;
     this.state = 'title';
@@ -302,6 +303,7 @@ export class Game {
   titleState() {
     return {
       mode: this.titleMode, unlocked: this.save.unlocked, wins: this.save.wins,
+      countdown: this.titleCountdown != null ? Math.ceil(this.titleCountdown) : null, joined: this.slots.map(s => ({ index: s.index, label: s.scheme.label })),
       canContinue: !!this.save.run, continueName: this.save.run ? LEVEL_NAMES[this.save.run.level] : '',
       free: this.freeSchemes().map(s => ({ join: s.join, label: s.label })), players: this.slots.map(s => s.index + s.scheme.id),
       status: this.netStatus(), open: this.net?.status === 'open', lobbies: this.lobbyList.map(l => ({ code: l.code, host: l.host, n: l.n, started: l.started, levelName: l.levelName })),
@@ -319,11 +321,11 @@ export class Game {
   titleAction(act) {
     this.audio.unlock();
     this.audio.play('click');
-    if (act === 'solo') { this.clearSlots(); this.startLevel(0, true); }
-    else if (act === 'couch') { this.titleMode = 'couch'; }
+    this.titleCountdown = null;
+    if (act === 'solo') { this.startLevel(0, true); }
     else if (act === 'online') this.openOnline();
     else if (act === 'continue') this.continueRun();
-    else if (act.startsWith('level')) { this.clearSlots(); this.startLevel(+act.slice(5), true); }
+    else if (act.startsWith('level')) { this.startLevel(+act.slice(5), true); }
     else if (act.startsWith('lobbylevel')) { const k = +act.slice(10); if (k < this.save.unlocked) this.lobbyLevel = k; }
     else if (act.startsWith('joinlist')) { const l = this.lobbyList[+act.slice(8)]; if (l) this.net?.send({ t: 'join', code: l.code, name: this.name }); }
   }
@@ -343,15 +345,19 @@ export class Game {
     const input = this.input;
     this.animateTitleBodies(dt);
     if (this.titleMode === 'main') {
-      if (input.wasPressed('Space', 'Enter', 'NumpadEnter') || input.anyPadPressed('a') || input.anyPadPressed('menu')) return this.titleAction('solo');
-      if (input.wasPressed('KeyC')) return this.titleAction('couch');
+      // same as the Mac app: jump joins (P1 = SPACE) and starts a short countdown; ENTER plays right away
+      for (const sc of this.freeSchemes()) if (joinPressed(sc, input)) {
+        const s = this.join(sc);
+        if (s) { this.audio.unlock(); s.body.shove(new V3(0, 700, 0)); this.titleCountdown = this.slots.length >= 4 ? 1.5 : this.slots.length === 1 ? 3 : 4; }
+      }
+      if (this.titleCountdown != null) {
+        this.titleCountdown -= dt;
+        if (this.titleCountdown <= 0) { this.titleCountdown = null; return this.startLevel(0, true); }
+      }
+      if (input.wasPressed('Enter', 'NumpadEnter') || input.anyPadPressed('menu')) return this.titleAction('solo');
       if (input.wasPressed('KeyO')) return this.titleAction('online');
-      if (input.wasPressed('KeyK') && this.save.run) return this.titleAction('continue');
+      if (input.wasPressed('KeyC') && this.save.run) return this.titleAction('continue');
       ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (input.wasPressed(k) && this.save.unlocked > i) this.titleAction('level' + i); });
-    } else if (this.titleMode === 'couch') {
-      for (const sc of this.freeSchemes()) if (joinPressed(sc, input)) { const s = this.join(sc); s?.body.shove(new V3(0, 700, 0)); }
-      if (input.wasPressed('Escape')) { this.clearSlots(); this.worldNode.add(this.titleBody.root); this.titleMode = 'main'; }
-      else if (input.wasPressed('Enter', 'NumpadEnter') || input.anyPadPressed('menu')) this.startLevel(0, true);
     } else this.updateOnlineTitle(dt);
     this.hud.drawTitle(this.titleState());
   }
@@ -1275,6 +1281,7 @@ export class Game {
   hostFlush() { if (this.role === 'host' && this.evOut.length) { this.net?.send({ t: 'ev', e: this.evOut }); this.evOut = []; } }
 
   openOnline() {
+    this.titleCountdown = null;
     this.clearSlots();
     this.worldNode.add(this.titleBody.root);
     this.titleMode = 'online'; this.netError = '';

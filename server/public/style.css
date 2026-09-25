@@ -6,7 +6,9 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #5fb8ff; font-family: var(--ui); color: #fff; user-select: none; -webkit-user-select: none; }
-canvas#game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+canvas#game { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+:root { --s: 1; }
+html, body { height: 100%; height: 100dvh; overscroll-behavior: none; touch-action: none; }
 #hud { position: fixed; inset: 0; pointer-events: none; }
 #boot { position: fixed; inset: 0; display: grid; place-items: center; font: 800 22px var(--ui); background: #5fb8ff; color: #fff; text-shadow: 2px 2px 0 #0b1d3a; }
 
@@ -101,14 +103,34 @@ table.stats td:last-child { border-radius: 0 8px 8px 0; }
 .pill.pulse { animation: blink 1s infinite; }
 
 /* ---------- title ---------- */
-.title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; pointer-events: none; padding-top: 5vh; overflow-y: auto; }
+.title { position: absolute; left: 0; top: 0; width: calc(100% / var(--s)); height: calc(100% / var(--s)); transform: scale(var(--s)); transform-origin: 0 0;
+  display: flex; flex-direction: column; align-items: center; pointer-events: none; padding-top: 5vh; overflow: hidden; }
 .logo { display: flex; align-items: center; font: 900 clamp(90px, 15vw, 190px)/1 var(--title); color: var(--red); text-shadow: 11px 11px 0 #3a0508; pointer-events: none; }
 .logo .lt { display: inline-block; }
 .logo .eye { display: inline-block; width: .6em; height: .6em; margin: 0 .03em; border-radius: 50%; background: #fff; border: .05em solid #3a0508; box-shadow: 8px 8px 0 #3a0508; position: relative; }
 .logo .eye i { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; margin: -23% 0 0 -23%; border-radius: 50%; background: #111; }
 .logo .eye i::after { content: ""; position: absolute; width: 28%; height: 28%; left: 20%; top: 20%; border-radius: 50%; background: #fff; }
-.title-body { display: flex; flex-direction: column; align-items: center; width: 100%; pointer-events: none; }
-.title-body button, .title-body input, .title-body label { pointer-events: auto; }
+.title-body { display: flex; flex-direction: column; align-items: center; width: 100%; flex: 1; pointer-events: none; }
+.title-body button, .title-body input, .title-body label, .title-body [data-key] { pointer-events: auto; cursor: pointer; }
+/* Mac-app title pieces */
+.coop { margin: 36px 0 0; padding: 6px 18px; border-radius: 16px; background: rgba(0,0,0,.72); font: 600 14px var(--ui); }
+.jrow { display: flex; justify-content: center; gap: 18px; margin-top: 16px; }
+.count { margin-top: 16px; padding: 10px 24px; border-radius: 23px; background: rgba(0,0,0,.6); border: 1.5px solid rgba(255,216,74,.6); color: var(--gold); font: 900 20px var(--ui); }
+.tpills { margin-top: auto; margin-bottom: 38px; display: flex; align-items: center; gap: 16px; }
+.pill.big { transform: scale(1.25); margin: 0 30px; }
+.pill.purple { background: #7a3fd1; } .pill.off { opacity: .4; }
+.pill.small { height: 34px; font-size: 13px; } .pill.small b { min-width: 30px; height: 24px; }
+.tlevels { display: none; gap: 10px; margin: -24px 0 28px; }
+.touchui .tlevels { display: flex; }
+.wins { position: absolute; bottom: 8px; font: 600 13px var(--ui); opacity: .85; }
+.pills.lv { flex-wrap: nowrap; transform: scale(.72); margin: -4px -80px -6px; }
+.obox .bigcode { font-size: 84px; margin: 0; }
+.obox .seats { margin: 6px 0 2px; }
+.code { position: relative; }
+#codeInput { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.01; font-size: 32px; border: 0; background: transparent; color: transparent; caret-color: transparent; }
+button.pill { color: #fff; cursor: pointer; pointer-events: auto; }
+button.pill:active, .jcard[data-key]:active, .lob:active { transform: scale(.96); }
+.pill.big:active { transform: scale(1.2); }
 .sub { margin: 18px 12px 0; padding: 8px 20px; border-radius: 21px; background: rgba(0,0,0,.45); font: 600 clamp(15px, 2vw, 21px) var(--ui); text-align: center; }
 button { font-family: var(--ui); color: #fff; cursor: pointer; }
 .solo { margin-top: 26px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 70px 12px; border-radius: 20px; border: 3px solid #fff;
@@ -159,6 +181,42 @@ h2.mode { margin: 16px 0 6px; font-size: 40px; text-shadow: 4px 4px 0 #0b1d3a; }
 @media (max-width: 900px) {
   .cards { grid-template-columns: repeat(2, 200px); } .card { height: 80px; }
   .board { width: 230px; } .board .bar { width: 60px; }
-  .score { top: auto; bottom: 44px; }
   .solo { padding: 14px 40px 10px; font-size: 34px; }
 }
+
+/* ---------- fit small screens: same layout as the Mac app, scaled down ---------- */
+.cards { transform: scale(var(--s)); transform-origin: 0 0; }
+.board { transform: scale(var(--s)); transform-origin: 100% 0; }
+.score { transform: translateX(-50%) scale(var(--s)); transform-origin: 50% 0; }
+.bossbar { top: calc(96px * var(--s)); transform: translateX(-50%) scale(var(--s)); transform-origin: 50% 0; }
+.overlay .box { transform: scale(var(--s)); }
+.help { transform: scale(max(var(--s), .7)); transform-origin: 50% 100%; }
+.toast { transform: translateX(-50%) scale(max(var(--s), .7)); }
+.banner { transform: scale(var(--s)); transform-origin: 50% 0; }
+.tag, .bubble { font-size: max(11px, calc(17px * var(--s))); }
+
+/* ---------- touch controls ---------- */
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#touch .stick { position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(22px, env(safe-area-inset-bottom)); width: 150px; height: 150px; border-radius: 50%;
+  background: rgba(0,0,0,.28); border: 3px solid rgba(255,255,255,.55); pointer-events: auto; touch-action: none; }
+#touch .knob { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(255,255,255,.85); border: 3px solid #1a0a0a; }
+#touch .tb { position: absolute; pointer-events: auto; touch-action: none; border-radius: 50%; border: 3px solid #fff; color: #fff; font: 900 14px var(--ui);
+  text-shadow: 0 1px 2px rgba(0,0,0,.6); box-shadow: 0 4px 0 rgba(0,0,0,.35); -webkit-tap-highlight-color: transparent; }
+#touch .tb.down { transform: translateY(3px) scale(.95); box-shadow: 0 1px 0 rgba(0,0,0,.35); filter: brightness(1.2); }
+#touch .jump { right: max(24px, env(safe-area-inset-right)); bottom: max(28px, env(safe-area-inset-bottom)); width: 96px; height: 96px; background: #1f8a4c; font-size: 17px; }
+#touch .spit { right: calc(max(24px, env(safe-area-inset-right)) + 108px); bottom: max(22px, env(safe-area-inset-bottom)); width: 76px; height: 76px; background: #2b5fb8; }
+#touch .squish { right: calc(max(24px, env(safe-area-inset-right)) + 18px); bottom: calc(max(28px, env(safe-area-inset-bottom)) + 108px); width: 76px; height: 76px; background: #b8862b; font-size: 12px; }
+#touch .honk { right: calc(max(24px, env(safe-area-inset-right)) + 116px); bottom: calc(max(22px, env(safe-area-inset-bottom)) + 92px); width: 62px; height: 62px; background: #7a3fd1; font-size: 12px; }
+#touch .tele { right: 50%; transform: translateX(50%); bottom: max(22px, env(safe-area-inset-bottom)); width: auto; height: 46px; padding: 0 18px; border-radius: 23px; background: #ffd84a; color: #2a1a00; text-shadow: none; animation: blink 1s infinite; }
+#touch .pause { left: 50%; transform: translateX(-50%); top: calc(max(8px, env(safe-area-inset-top)) + 96px * var(--s)); width: 46px; height: 46px; background: rgba(0,0,0,.45); font-size: 13px; }
+.touchui .help { bottom: auto; top: calc(112px * var(--s) + 60px); }
+
+/* phones held upright: the game is landscape, like the Mac app */
+#rotate { display: none; position: fixed; inset: 0; z-index: 20; background: radial-gradient(circle at 50% 35%, #2b5fb8, #0b1d3a 75%);
+  flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+#rotate .ph { width: 70px; height: 120px; border: 6px solid #fff; border-radius: 14px; animation: turn 1.8s ease-in-out infinite; margin-bottom: 30px; }
+#rotate b { font: 900 30px var(--title); color: #ffd84a; text-shadow: 3px 3px 0 #3a2a00; }
+#rotate p { font: 600 16px var(--ui); opacity: .85; margin: 10px 0 0; }
+@keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
+body.forcetouch.portrait #rotate { display: flex; }

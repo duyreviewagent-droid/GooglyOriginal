@@ -422,9 +422,6 @@ final class HUD {
             l.position = CGPoint(x: 0, y: 20 - CGFloat(i) * 32)
             panel.addChild(l)
         }
-        let by = lbl("a game by Vincent", size: 14, color: NSColor(white: 1, alpha: 0.7), font: uiFontMed)
-        by.position = CGPoint(x: 0, y: -150)
-        panel.addChild(by)
         let go = keyPill("ENTER", "back to the title")
         go.position = CGPoint(x: 0, y: -190)
         panel.addChild(go)
@@ -478,9 +475,11 @@ final class HUD {
         sb.position = sub.position
         title.addChild(sb)
         title.addChild(sub)
-        let by = lbl("a game by Vincent" + (save.wins > 0 ? "  ·  🏆 × \(save.wins)" : ""), size: 13, color: NSColor(white: 1, alpha: 0.8), font: uiFontMed)
-        by.position = CGPoint(x: 0, y: -size.height / 2 + 22)
-        title.addChild(by)
+        if save.wins > 0 {
+            let w = lbl("🏆 × \(save.wins)", size: 13, color: NSColor(white: 1, alpha: 0.8), font: uiFontMed)
+            w.position = CGPoint(x: 0, y: -size.height / 2 + 22)
+            title.addChild(w)
+        }
         let solo = keyPill("ENTER", "PLAY SOLO")
         solo.setScale(1.25)
         var pills: [SKNode] = [solo, keyPill("O", "play online", color: hex(0x7a3fd1))]

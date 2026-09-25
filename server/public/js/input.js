@@ -6,6 +6,8 @@ export class Input {
     this.mouse = { x: 0, y: 0 }; this.mouseHeld = false; this.mouseClicked = false; this._clicked = false;
     this.rightClicked = false; this._right = false; this.scroll = 0; this._scroll = 0; this.mouseMovedRecently = 0; this._moved = false;
     this.enabled = true;
+    /** Touch controls: an analog stick and virtual key taps (see touch.js). */
+    this.touchMove = { x: 0, y: 0 };
     this.pads = []; this.padPrev = [];
     const block = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Slash', 'Quote']);
     addEventListener('keydown', e => {
@@ -50,6 +52,9 @@ export class Input {
   padHeld(i, btn) { return !!(this.pads[i] && this.pads[i][btn]); }
   padPressed(i, btn) { return !!(this.pads[i] && this.pads[i][btn] && !(this.padPrev[i] && this.padPrev[i][btn])); }
   anyPadPressed(btn) { return this.pads.some((_, i) => this.padPressed(i, btn)); }
+  /** A virtual key press (on-screen buttons and pills). */
+  tap(code) { this.audioUnlock?.(); this._pressed.add(code); }
+  press(code, down) { if (down) { if (!this.held.has(code)) this._pressed.add(code); this.held.add(code); } else this.held.delete(code); }
   clear() { this.held.clear(); this._pressed.clear(); this.mouseHeld = false; }
 }
 
@@ -82,6 +87,7 @@ export function readActions(scheme, input, solo) {
     a.mouseAim = input.mouseClicked || input.mouseHeld;
     a.honk = input.wasPressed('KeyE', 'KeyH') || input.rightClicked;
     a.teleport = input.wasPressed('KeyT');
+    a.move.x += input.touchMove.x; a.move.y += input.touchMove.y;
   } else if (scheme.id === 'keysB') {
     if (input.isHeld('ArrowLeft')) a.move.x -= 1;
     if (input.isHeld('ArrowRight')) a.move.x += 1;

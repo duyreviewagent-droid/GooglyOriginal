@@ -4,6 +4,7 @@ import { GameAudio } from './audio.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { Game } from './game.js';
+import { TouchControls, isTouch } from './touch.js';
 
 const canvas = document.getElementById('game');
 const Q = new URLSearchParams(location.search);
@@ -18,7 +19,11 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 5, 14000);
 function resize() {
-  renderer.setSize(innerWidth, innerHeight, false);
+  const w = document.documentElement.clientWidth || innerWidth, h = document.documentElement.clientHeight || innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  return;
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 }
@@ -27,6 +32,7 @@ resize();
 
 const audio = new GameAudio();
 const input = new Input(canvas);
+input.audioUnlock = () => audio.unlock();
 const unlock = () => audio.unlock();
 addEventListener('pointerdown', unlock);
 addEventListener('keydown', unlock);
@@ -39,6 +45,8 @@ try {
   throw e;
 }
 window.googly = game;
+const touch = isTouch() || Q.has('touch') ? new TouchControls(input) : null;
+if (Q.has('touch')) { document.body.classList.add('forcetouch'); if (innerHeight > innerWidth) document.body.classList.add('portrait'); }
 document.getElementById('boot').remove();
 
 // headless test runs (?shim=1) get a timer loop because requestAnimationFrame doesn't fire there
@@ -47,7 +55,7 @@ const nextFrame = shim ? f => setTimeout(() => f(performance.now()), 33) : f => 
 let last = performance.now();
 function frame(now) {
   const dt = (now - last) / 1000; last = now;
-  try { game.tick(dt); } catch (e) { console.error(e); window.__err = String(e && e.stack || e); showError(window.__err); }
+  try { game.tick(dt); touch?.update(game); } catch (e) { console.error(e); window.__err = String(e && e.stack || e); showError(window.__err); }
   nextFrame(frame);
 }
 nextFrame(frame);

@@ -8,7 +8,11 @@ import { JUNK_INFO } from './things.js';
 const $ = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const css = c => '#' + c.toString(16).padStart(6, '0');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-export const pill = (key, what, cls = '') => `<span class="pill ${cls}"><b>${esc(key)}</b>${esc(what)}</span>`;
+/** Key name on a pill → the key it presses when tapped. */
+const KEYCODE = { ESC: 'Escape', ENTER: 'Enter', SPACE: 'Space', R: 'KeyR', Q: 'KeyQ', M: 'KeyM', H: 'KeyH', J: 'KeyJ', O: 'KeyO', C: 'KeyC', T: 'KeyT',
+  1: 'Digit1', 2: 'Digit2', 3: 'Digit3', 4: 'Digit4', 5: 'Digit5', 6: 'Digit6' };
+export const pill = (key, what, cls = '', code = KEYCODE[key]) =>
+  `<button class="pill ${cls}"${code ? ` data-key="${code}"` : ''}><b>${esc(key)}</b>${esc(what)}</button>`;
 
 export class HUD {
   constructor(root, game) {
@@ -35,6 +39,22 @@ export class HUD {
     this.keys = {};
     this.toastT = 0; this.savedT = 0; this.bannerT = 0; this.helpT = 0;
     this.boss.style.display = 'none';
+    // every pill / card with data-key presses that key when tapped or clicked
+    root.addEventListener('click', e => {
+      const b = e.target.closest('[data-key]');
+      if (b && root.contains(b)) { e.stopPropagation(); game.input.tap(b.dataset.key); }
+    });
+    this.touch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window || new URLSearchParams(location.search).has('touch');
+    root.classList.toggle('touchui', this.touch);
+    this.fit();
+    addEventListener('resize', () => this.fit());
+  }
+
+  /** Scales the whole interface down on small screens so it looks exactly like the Mac app, just smaller. */
+  fit() {
+    const s = Math.max(0.4, Math.min(1, innerWidth / 1180, innerHeight / 800));
+    document.documentElement.style.setProperty('--s', s.toFixed(3));
+    this.scale = s;
   }
 
   // ------------------------------------------------ per frame
@@ -47,7 +67,8 @@ export class HUD {
     this.score.querySelector('small').textContent = g.slots.length > 1 || g.role !== 'offline' ? 'TEAM SCORE' : 'SCORE';
     this.score.querySelector('i').textContent = g.level ? g.level.name.toUpperCase() : '';
     if (g.state === 'playing') this.helpT += dt;
-    const hk = g.slots.map(s => s.scheme.hint).filter(Boolean).join('   |   ') + (g.slots.length === 1 ? ' · scroll zoom · ESC pause' : '');
+    const hk = this.touch ? 'left thumb: move · JUMP · SPIT (aims itself) · hold SQUISH, let go = BOING · SQUISH in the air = butt slam'
+      : g.slots.map(s => s.scheme.hint).filter(Boolean).join('   |   ') + (g.slots.length === 1 ? ' · scroll zoom · ESC pause' : '');
     if (this.keys.help !== hk) { this.keys.help = hk; this.help.textContent = hk; }
     this.help.style.opacity = g.state === 'paused' ? 1 : g.state === 'playing' ? Math.max(0, Math.min(1, 1.4 - (this.helpT - 22) / 3)) : 0;
     // blindness only on a solo screen
@@ -111,7 +132,7 @@ export class HUD {
   popText(text, color, size) {
     const e = $('div', 'popup');
     e.innerHTML = text.split('\n').map(l => `<span data-t="${esc(l.toUpperCase())}">${esc(l.toUpperCase())}</span>`).join('<br>');
-    e.style.color = css(color); e.style.fontSize = size * 1.15 + 'px';
+    e.style.color = css(color); e.style.fontSize = size * 1.15 * Math.max(0.6, this.scale || 1) + 'px';
     e.style.setProperty('--rot', (Math.random() * 0.4 - 0.2) + 'rad');
     this.world.append(e);
     return e;
@@ -157,69 +178,93 @@ export class HUD {
   showWin(score, players) {
     this.box(0xffd84a, `<h1 class="huge" data-t="YOU WIN!" style="color:#ffd84a">YOU WIN!</h1>
       <p>${players > 1 ? 'Your googly gang' : 'You'} fired the CEO of Cube Corp and flushed<br>three golden toilets. Officially the googliest alive.</p>
-      <p class="final">FINAL SCORE ${score}</p><p class="dim">a game by Vincent</p><div class="pills">${pill('ENTER', 'back to the title', 'green')}</div>`);
+      <p class="final">FINAL SCORE ${score}</p><div class="pills">${pill('ENTER', 'back to the title', 'green')}</div>`);
   }
 
   // ------------------------------------------------ title
   showTitle() { this.title.style.display = ''; this.keys.title = ''; }
   hideTitle() { this.title.style.display = 'none'; this.helpT = 0; }
 
-  /** mode: 'main' | 'couch' | 'online' | 'code' | 'lobby' | 'name' */
+  /** mode: 'main' | 'online' | 'code' | 'lobby' — same screens and wording as the Mac app */
   drawTitle(state) {
-    const key = JSON.stringify(state);
-    if (key === this.keys.title) return;
-    this.keys.title = key;
     const g = this.g;
+    // the code screen keeps its text box (and the phone keyboard) alive between frames
+    const key = JSON.stringify(state.mode === 'code' ? { ...state, code: '' } : state);
+    if (key === this.keys.title) { if (state.mode === 'code') this.updateCode(state); return; }
+    this.keys.title = key;
     let html = '';
     if (state.mode === 'main') {
-      html = `<p class="sub">Wobbly jelly. Googly eyes. Spit junk at grumpy cubes. Flush yourself down the golden toilet.</p>
-        <button class="solo" data-act="solo"><span>▶ PLAY SOLO</span><small>SPACE or ENTER</small></button>
-        <div class="optional"><span class="opt">optional</span>
-          <button class="alt" data-act="couch"><b>C</b> COUCH CO-OP <small>up to 4 on this computer</small></button>
-          <button class="alt purple" data-act="online"><b>O</b> PLAY ONLINE <small>lobbies with codes</small></button>
-          ${state.canContinue ? `<button class="alt blue" data-act="continue"><b>K</b> CONTINUE <small>${esc(state.continueName)}</small></button>` : ''}
-        </div>
-        ${state.unlocked > 1 ? `<div class="levels">${[0, 1, 2].slice(0, state.unlocked).map(i => `<button data-act="level${i}"><b>${i + 1}</b> ${esc(LEVEL_NAMES[i])}</button>`).join('')}</div>` : ''}
-        <p class="controls">WASD move · SPACE jump · hold SHIFT squish, let go = BOING · SHIFT in air = butt slam · CLICK spit at the mouse · E honk · M mute</p>`;
-    } else if (state.mode === 'couch') {
       const cards = [0, 1, 2, 3].map(i => {
-        const s = g.slots.find(x => x.index === i), col = css(PLAYER_COLORS[i]);
-        if (s) return `<div class="jcard on" style="border-color:${col};background:${col}66"><h3 data-t="P${i + 1} ${PLAYER_NAMES[i]}">P${i + 1} ${PLAYER_NAMES[i]}</h3><p>${esc(s.scheme.label)}</p><em>READY!</em></div>`;
-        return `<div class="jcard"><h3 style="color:${col}">P${i + 1}</h3><p class="y">PRESS JUMP TO JOIN</p>${state.free.slice(0, 2).map(f => `<p class="d">${esc(f.join)} · ${esc(f.label)}</p>`).join('')}</div>`;
+        const j = state.joined.find(x => x.index === i), col = css(PLAYER_COLORS[i]);
+        if (j) return `<div class="jcard on" style="border-color:${col};background:${col}66"><h3 data-t="P${i + 1} ${PLAYER_NAMES[i]}">P${i + 1} ${PLAYER_NAMES[i]}</h3><p>${esc(j.label)}</p><em>READY!</em></div>`;
+        return `<div class="jcard"${i === 0 ? ' data-key="Space"' : ''}><h3 style="color:${col}">P${i + 1}</h3><p class="y">PRESS JUMP TO JOIN</p>${state.free.slice(0, 2).map(f => `<p class="d">${esc(f.join)}  ·  ${esc(f.label)}</p>`).join('')}</div>`;
       }).join('');
-      html = `<h2 class="mode">COUCH CO-OP</h2><div class="jrow">${cards}</div>
-        <div class="pills">${pill('ENTER', g.slots.length ? `start with ${g.slots.length} player${g.slots.length > 1 ? 's' : ''}` : 'start', 'green')}${pill('ESC', 'back')}</div>`;
+      const n = state.joined.length;
+      const count = state.countdown != null
+        ? `<div class="count">${n <= 1 ? `PLAYING SOLO IN ${state.countdown}…  (ENTER = go now · friends press jump to join)` : `${n} PLAYERS · STARTING IN ${state.countdown}…  (ENTER = go now)`}</div>` : '';
+      html = `<p class="sub">Wobbly jelly. Googly eyes. Up to four players. One golden toilet.</p>
+        <p class="coop">COUCH CO-OP (optional): friends on this computer press their jump key to join · SPACE · / · Ⓐ</p>
+        <div class="jrow">${cards}</div>${count}
+        <div class="tpills">${pill('ENTER', 'PLAY SOLO', 'green big')}${pill('O', 'play online', 'purple')}${state.canContinue ? pill('C', 'continue · ' + state.continueName, 'blue') : ''}${state.unlocked > 1 ? pill('1–' + state.unlocked, 'pick level', '', null) : ''}${pill('M', 'mute')}</div>
+        ${state.unlocked > 1 ? `<div class="tlevels">${[0, 1, 2].slice(0, state.unlocked).map(i => pill(String(i + 1), LEVEL_NAMES[i], 'small')).join('')}</div>` : ''}
+        ${state.wins ? `<p class="wins">🏆 × ${state.wins}</p>` : ''}`;
     } else if (state.mode === 'online') {
-      const list = state.lobbies.slice(0, 6).map((l, k) => `<button class="lob" data-act="joinlist${k}"><b>${k + 1}</b><code>${esc(l.code)}</code><span>${esc(l.host)}'s lobby</span><i>${l.n}/4 · ${l.started ? 'playing' : 'waiting'} · ${esc(l.levelName || '')}</i></button>`).join('');
+      const list = state.lobbies.slice(0, 6).map((l, k) => `<button class="lob" data-key="Digit${k + 1}"><b>${k + 1}</b><code>${esc(l.code)}</code><span>${esc(l.host)}'s lobby</span><i>${l.n}/4 · ${l.started ? 'playing ' : 'waiting · '}${esc(l.levelName || '')}</i></button>`).join('');
       html = `<div class="obox"><h2 data-t="PLAY ONLINE">PLAY ONLINE</h2><p class="dim">${esc(state.status)}</p>
-        <label class="namefield">YOUR NAME <input id="nameInput" maxlength="14" value="${esc(state.name)}"></label>
         <div class="pills">${pill('H', 'host a lobby', state.open ? 'green' : 'grey')}${pill('J', 'join with a code', 'blue')}</div>
         <h4>OPEN LOBBIES</h4><div class="lobs">${list || `<p class="dim">${state.open ? 'none right now — host one and send your friends the code' : '…'}</p>`}</div>
-        ${state.error ? `<p class="err">${esc(state.error)}</p>` : ''}<p class="dim small">ESC — back · works with the GooglyOriginal Mac app too</p></div>`;
+        ${state.error ? `<p class="err">${esc(state.error)}</p>` : ''}
+        <label class="namefield">YOUR NAME <input id="nameInput" maxlength="14" value="${esc(state.name)}"></label>
+        <div class="pills">${pill('ESC', 'back')}</div><p class="dim small">solo & couch play are on the main title</p></div>`;
     } else if (state.mode === 'code') {
-      const ch = [...state.code];
       html = `<div class="obox"><h2 data-t="JOIN A LOBBY">JOIN A LOBBY</h2><p class="dim">type your friend's 4-letter code</p>
-        <div class="code">${[0, 1, 2, 3].map(i => `<span class="${i === ch.length ? 'cur' : ''}">${esc(ch[i] || '')}</span>`).join('')}</div>
-        <div class="pills">${pill('ENTER', ch.length === 4 ? 'join lobby' : 'type 4 letters', ch.length === 4 ? 'green' : 'grey')}${pill('ESC', 'back')}</div>
-        <p class="${state.error ? 'err' : 'dim'}">${esc(state.error || state.status)}</p></div>`;
+        <div class="code">${[0, 1, 2, 3].map(() => '<span></span>').join('')}<input id="codeInput" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text"></div>
+        <div class="pills"><span class="gopill"></span>${pill('ESC', 'back')}</div>
+        <p class="cstatus"></p></div>`;
     } else if (state.mode === 'lobby') {
       const seats = [0, 1, 2, 3].map(i => {
         const s = g.slots.find(x => x.index === i), col = css(PLAYER_COLORS[i]);
         return `<div class="seat${s ? ' on' : ''}" style="${s ? `border-color:${col};background:${col}66` : ''}"><b>${s ? esc(s.name) + (i === g.mySeat ? ' (you)' : '') : 'waiting…'}</b><small style="color:${col}">${i === 0 ? 'HOST' : 'P' + (i + 1)}</small></div>`;
       }).join('');
-      const hostBits = state.host ? `<div class="levels">${[0, 1, 2].map(i => `<button class="${i === state.level ? 'sel' : ''}" ${i < state.unlocked ? '' : 'disabled'} data-act="lobbylevel${i}"><b>${i + 1}</b> ${esc(LEVEL_NAMES[i])}</button>`).join('')}</div>
-        <div class="pills">${pill('ENTER', 'start the game', 'green')}</div>` : '<p class="wait">waiting for the host to start…</p>';
+      const n = g.slots.length;
+      const hostBits = state.host
+        ? `<div class="pills lv">${[0, 1, 2].map(i => pill(String(i + 1), LEVEL_NAMES[i], i === state.level ? 'purple' : i < state.unlocked ? '' : 'off')).join('')}</div>
+           <div class="pills">${pill('ENTER', n <= 1 ? 'start — solo is fine' : `start with ${n} players`, 'green')}${pill('ESC', 'leave')}</div>`
+        : `<p class="wait">waiting for the host to start…</p><div class="pills">${pill('ESC', 'leave')}</div>`;
       html = `<div class="obox"><h2 data-t="LOBBY">LOBBY</h2><p class="dim">tell your friends this code · up to 4 players · they can also join mid-game</p>
         <div class="bigcode" data-t="${esc(state.code.split('').join(' '))}">${esc(state.code.split('').join(' '))}</div><div class="seats">${seats}</div>${hostBits}
-        <p class="dim small">${esc(state.status)} · ESC leave</p></div>`;
+        <p class="dim small">${esc(state.status)}</p></div>`;
     }
-    this.titleBody.innerHTML = html + `<p class="by">a game by Vincent${state.wins ? ' · 🏆 × ' + state.wins : ''}</p>`;
+    this.titleBody.innerHTML = html;
     const ni = this.titleBody.querySelector('#nameInput');
     if (ni) {
       ni.addEventListener('input', () => g.setName(ni.value));
       ni.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') ni.blur(); e.stopPropagation(); });
     }
-    for (const b of this.titleBody.querySelectorAll('[data-act]')) b.addEventListener('click', e => { e.stopPropagation(); g.titleAction(b.dataset.act); });
+    const ci = this.titleBody.querySelector('#codeInput');
+    if (ci) {
+      ci.value = state.code;
+      ci.addEventListener('input', () => { g.codeEntry = ci.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); ci.value = g.codeEntry; });
+      ci.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); g.input.tap('Enter'); }
+        else if (e.key === 'Escape') { e.preventDefault(); g.input.tap('Escape'); }
+        e.stopPropagation();
+      });
+      setTimeout(() => ci.focus(), 0);
+      this.updateCode(state);
+    }
+  }
+
+  updateCode(state) {
+    const b = this.titleBody, ch = [...state.code];
+    b.querySelectorAll('.code span').forEach((e, i) => { e.textContent = ch[i] || ''; e.className = i === ch.length ? 'cur' : ''; });
+    const ci = b.querySelector('#codeInput');
+    if (ci && ci.value !== state.code) ci.value = state.code;
+    const gp = b.querySelector('.gopill');
+    const want = ch.length === 4 ? pill('ENTER', 'join lobby', 'green') : pill('ENTER', 'type 4 letters', 'grey');
+    if (gp && gp.innerHTML !== want) gp.innerHTML = want;
+    const st = b.querySelector('.cstatus');
+    if (st) { st.textContent = state.error || state.status; st.className = 'cstatus ' + (state.error ? 'err' : 'dim'); }
   }
 
   /** Bouncy logo; the O's are googly eyes riding the spring. */
