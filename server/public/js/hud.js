@@ -193,7 +193,17 @@ export class HUD {
     if (key === this.keys.title) { if (state.mode === 'code') this.updateCode(state); return; }
     this.keys.title = key;
     let html = '';
-    if (state.mode === 'main') {
+    if (state.mode === 'main' && this.touch) {
+      // phones & tablets: one giant PLAY button that starts a solo game straight away; online is optional
+      html = `<p class="sub">Wobbly jelly. Googly eyes. One golden toilet.</p>
+        <button class="tplay" data-key="Enter"><span>▶ PLAY</span><small>tap to play solo · no lobby needed</small></button>
+        <div class="toptional"><span class="opt">optional</span>
+          <button class="alt purple" data-key="KeyO"><b>👥</b> PLAY ONLINE <small>host or join a lobby with a code</small></button>
+          ${state.canContinue ? `<button class="alt blue" data-key="KeyC"><b>↻</b> CONTINUE <small>${esc(state.continueName)}</small></button>` : ''}
+        </div>
+        ${state.unlocked > 1 ? `<div class="tlevels">${[0, 1, 2].slice(0, state.unlocked).map(i => pill(String(i + 1), LEVEL_NAMES[i], 'small')).join('')}</div>` : ''}
+        ${state.wins ? `<p class="wins">🏆 × ${state.wins}</p>` : ''}`;
+    } else if (state.mode === 'main') {
       const cards = [0, 1, 2, 3].map(i => {
         const j = state.joined.find(x => x.index === i), col = css(PLAYER_COLORS[i]);
         if (j) return `<div class="jcard on" style="border-color:${col};background:${col}66"><h3 data-t="P${i + 1} ${PLAYER_NAMES[i]}">P${i + 1} ${PLAYER_NAMES[i]}</h3><p>${esc(j.label)}</p><em>READY!</em></div>`;

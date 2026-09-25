@@ -220,3 +220,17 @@ h2.mode { margin: 16px 0 6px; font-size: 40px; text-shadow: 4px 4px 0 #0b1d3a; }
 @keyframes turn { 0%, 30% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 @media (orientation: portrait) and (pointer: coarse) { #rotate { display: flex; } }
 body.forcetouch.portrait #rotate { display: flex; }
+
+/* ---------- touch title: one giant PLAY ---------- */
+.tplay { margin-top: calc(18px * var(--s, 1)); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 72px 10px; border-radius: 22px; border: 3px solid #fff;
+  background: linear-gradient(#27b35f, #1a7d42); box-shadow: 0 7px 0 #0f4f29, 0 12px 30px rgba(0,0,0,.35); pointer-events: auto; cursor: pointer; color: #fff;
+  font: 900 clamp(38px, 9vmin, 64px) var(--title); letter-spacing: 1px; text-shadow: 3px 3px 0 #0f4f29; animation: soloPulse 1.6s ease-in-out infinite; touch-action: manipulation; }
+.tplay small { font: 700 13px var(--ui); letter-spacing: .5px; opacity: .9; text-shadow: none; }
+.tplay:active { transform: translateY(4px); box-shadow: 0 3px 0 #0f4f29; }
+@keyframes soloPulse { 50% { transform: scale(1.04); } }
+.toptional { margin-top: 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 12px 14px; border-radius: 16px; background: rgba(0,0,0,.4); position: relative; pointer-events: auto; }
+.toptional .opt { position: absolute; left: 50%; top: -10px; transform: translateX(-50%); background: #2b2f3a; border-radius: 10px; padding: 1px 10px; font: 700 11px var(--ui); letter-spacing: 1px; text-transform: uppercase; }
+.toptional .alt { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px 0 8px; border-radius: 12px; background: #2b2f3a; border: 2px solid rgba(255,255,255,.8); font: 900 16px var(--ui); color: #fff; touch-action: manipulation; }
+.toptional .alt b { min-width: 32px; height: 30px; border-radius: 8px; background: rgba(0,0,0,.3); display: grid; place-items: center; }
+.toptional .alt small { font: 600 11px var(--ui); opacity: .8; }
+.toptional .alt.purple { background: #7a3fd1; } .toptional .alt.blue { background: #2b5fb8; }
