@@ -130,6 +130,7 @@ export class Player {
 
   buildNodes() {
     this.root = new THREE.Group();
+    this.root.userData.player = true;
     const geo = new THREE.BufferGeometry();
     this.posAttr = new THREE.BufferAttribute(new Float32Array(this.meshSkin.length * 3), 3);
     this.posAttr.setUsage(THREE.DynamicDrawUsage);
@@ -193,9 +194,9 @@ export class Player {
   }
   eyeFrame(i) {
     const k = Math.min(i, EYE_SLOTS.length - 1);
-    return this.frame(this.skinned(this.slotSkin[k]), this.slotNormals[k], 1.5);
+    return this.basis(this.skinned(this.slotSkin[k]), this.slotNormals[k], 1.5);
   }
-  frame(p, n0, lift) {
+  basis(p, n0, lift) {
     const n = M3.mulv(this.G, n0).norm;
     const up = M3.mulv(this.G, new V3(0, 1, 0)).norm;
     let r = up.cross(n);
@@ -530,7 +531,7 @@ export class Player {
     this.bodyMat.emissive.copy(this.ko > 0 ? new THREE.Color(0) : this.glow);
     this.drawEyes();
 
-    const [mp, mn, mr, mu] = this.frame(this.skinned(this.mouthSkin), this.mouthNormal, 0);
+    const [mp, mn, mr, mu] = this.basis(this.skinned(this.mouthSkin), this.mouthNormal, 0);
     this.mouth.position.set(mp.x, mp.y, mp.z);
     const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(mr.x, mr.y, mr.z), new THREE.Vector3(mu.x, mu.y, mu.z), new THREE.Vector3(mn.x, mn.y, mn.z));
     this.mouth.quaternion.setFromRotationMatrix(m);

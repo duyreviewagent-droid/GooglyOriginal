@@ -150,7 +150,8 @@ export class Enemy {
 }
 
 export class Particle {
-  constructor(node, pos, vel, life, { gravity = -900, spin = 0, drag = 0.5, shrink = true } = {}) {
+  constructor(node, pos, vel, life, { gravity = -900, spin = 0, drag = 0.5, shrink = true, grow = 0 } = {}) {
+    this.grow = grow;
     this.node = node; this.pos = pos.clone(); this.vel = vel.clone(); this.life = life; this.maxLife = life;
     this.gravity = gravity; this.spin = spin; this.drag = drag; this.shrink = shrink;
     this.axis = new THREE.Vector3(frand(-1, 1), frand(-1, 1), frand(-1, 1)).normalize(); this.angle = 0;

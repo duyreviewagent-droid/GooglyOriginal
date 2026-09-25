@@ -2,6 +2,9 @@
 // The host's Mac runs the game world; this server only matches players into lobbies (4-letter codes)
 // and relays messages: inputs from guests go to the host, world snapshots and events go to the guests.
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 8000);
@@ -54,46 +57,26 @@ function leave(ws, reason = 'left') {
 function log(s) { console.log(new Date().toISOString().slice(11, 19), s); }
 
 // ---------------------------------------------------------------- http
-const page = () => `<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>GooglyOriginal</title>
-<style>
-  :root { color-scheme: dark; }
-  body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 50% 20%, #2b5fb8, #0b1d3a 70%); color: #fff;
-         font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }
-  .card { max-width: 640px; margin: 24px 16px; padding: 32px; background: rgba(0,0,0,.55); border: 2px solid rgba(255,216,74,.5); border-radius: 22px; }
-  h1 { font-family: Futura, "Futura-CondensedExtraBold", Impact, sans-serif; font-size: clamp(48px, 12vw, 88px); margin: 0; color: #e8262f;
-       text-shadow: 5px 5px 0 #3a0508; letter-spacing: 1px; }
-  .o { display: inline-block; width: .7em; height: .7em; background: #fff; border: .07em solid #3a0508; border-radius: 50%; position: relative; vertical-align: -.02em; }
-  .o::after { content: ""; position: absolute; width: 50%; height: 50%; background: #111; border-radius: 50%; left: 28%; top: 38%; }
-  p { font-size: 17px; line-height: 1.5; opacity: .9 }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-weight: 700; }
-  td { padding: 8px 6px; border-top: 1px solid rgba(255,255,255,.15); }
-  .code { font-family: Menlo, monospace; color: #ffd84a; font-size: 20px; letter-spacing: 3px; }
-  .muted { opacity: .6; font-weight: 500; }
-</style></head><body><div class="card">
-<h1>G<span class="o"></span><span class="o"></span>GLY</h1>
-<p><b>GooglyOriginal</b> online server — wobbly jelly, googly eyes, up to four players per lobby.
-Open the GooglyOriginal Mac app, press <b>O</b> on the title screen, then <b>Host</b> to get a lobby code or <b>Join</b> with a friend's code.</p>
-<table id="t"><tr><td class="muted">loading open lobbies…</td></tr></table>
-</div><script>
-async function load() {
-  const r = await fetch('/lobbies'); const j = await r.json(); const t = document.getElementById('t');
-  t.innerHTML = j.lobbies.length ? j.lobbies.map(l => '<tr><td class="code">' + l.code + '</td><td>' + l.host.replace(/</g, '') +
-    '</td><td>' + l.n + '/' + l.max + '</td><td class="muted">' + (l.started ? 'playing · ' : 'waiting · ') + l.levelName + '</td></tr>').join('')
-    : '<tr><td class="muted">No open lobbies right now — host one from the Mac app.</td></tr>';
-}
-load(); setInterval(load, 5000);
-</script></body></html>`;
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
 
 const server = http.createServer((req, res) => {
-  const url = req.url.split('?')[0];
+  const url = decodeURIComponent(req.url.split('?')[0]);
   if (url === '/health') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.end('ok'); }
   if (url === '/lobbies') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' });
     return res.end(JSON.stringify({ lobbies: publicList(), players: [...lobbies.values()].reduce((a, L) => a + roster(L).length, 0) }));
   }
-  if (url === '/' || url === '/index.html') { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); return res.end(page()); }
-  res.writeHead(404); res.end('not found');
+  // the browser game (and three.js from node_modules)
+  let file;
+  if (url.startsWith('/three/')) file = path.join(ROOT, 'node_modules/three/build', path.basename(url));
+  else file = path.join(ROOT, 'public', url === '/' ? 'index.html' : url);
+  if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404); return res.end('not found'); }
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.end(data);
+  });
 });
 
 // ---------------------------------------------------------------- websockets
