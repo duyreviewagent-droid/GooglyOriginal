@@ -1,7 +1,9 @@
 // DOM HUD in GooglyGamble's style: Futura Condensed titles with hard shadows, Avenir Next UI, dark rounded
 // panels with coloured borders, key "pills". World-anchored text (popups, bubbles, name tags) is projected
 // from 3D each frame by the game.
-import { LEVEL_NAMES } from './levels.js';
+import { LEVEL_NAMES, levelName } from './levels.js';
+// level picker: the three story levels, plus the furthest endless level you've reached (key 4)
+const levelPicks = unlocked => [...[0, 1, 2].slice(0, unlocked).map(i => [String(i + 1), LEVEL_NAMES[i], i]), ...(unlocked > 3 ? [['4', `∞ Level ${unlocked}`, unlocked - 1]] : [])];
 import { PLAYER_COLORS, PLAYER_NAMES } from './player.js';
 import { JUNK_INFO } from './things.js';
 
@@ -178,7 +180,7 @@ export class HUD {
   showWin(score, players) {
     this.box(0xffd84a, `<h1 class="huge" data-t="YOU WIN!" style="color:#ffd84a">YOU WIN!</h1>
       <p>${players > 1 ? 'Your googly gang' : 'You'} fired the CEO of Cube Corp and flushed<br>three golden toilets. Officially the googliest alive.</p>
-      <p class="final">FINAL SCORE ${score}</p><div class="pills">${pill('ENTER', 'back to the title', 'green')}</div>`);
+      <p class="final">SCORE ${score}</p><p>…but the toilets never end. Endless levels from here on!</p><div class="pills">${pill('ENTER', 'keep going · level 4', 'green pulse')}${pill('ESC', 'back to the title')}</div>`);
   }
 
   // ------------------------------------------------ title
@@ -201,7 +203,7 @@ export class HUD {
           <button class="alt purple" data-key="KeyO"><b>👥</b> PLAY ONLINE <small>host or join a lobby with a code</small></button>
           ${state.canContinue ? `<button class="alt blue" data-key="KeyC"><b>↻</b> CONTINUE <small>${esc(state.continueName)}</small></button>` : ''}
         </div>
-        ${state.unlocked > 1 ? `<div class="tlevels">${[0, 1, 2].slice(0, state.unlocked).map(i => pill(String(i + 1), LEVEL_NAMES[i], 'small')).join('')}</div>` : ''}
+        ${state.unlocked > 1 ? `<div class="tlevels">${levelPicks(state.unlocked).map(([k, name]) => pill(k, name, 'small')).join('')}</div>` : ''}
         ${state.wins ? `<p class="wins">🏆 × ${state.wins}</p>` : ''}`;
     } else if (state.mode === 'main') {
       const cards = [0, 1, 2, 3].map(i => {
@@ -215,8 +217,8 @@ export class HUD {
       html = `<p class="sub">Wobbly jelly. Googly eyes. Up to four players. One golden toilet.</p>
         <p class="coop">COUCH CO-OP (optional): friends on this computer press their jump key to join · SPACE · / · Ⓐ</p>
         <div class="jrow">${cards}</div>${count}
-        <div class="tpills">${pill('ENTER', 'PLAY SOLO', 'green big')}${pill('O', 'play online', 'purple')}${state.canContinue ? pill('C', 'continue · ' + state.continueName, 'blue') : ''}${state.unlocked > 1 ? pill('1–' + state.unlocked, 'pick level', '', null) : ''}${pill('M', 'mute')}</div>
-        ${state.unlocked > 1 ? `<div class="tlevels">${[0, 1, 2].slice(0, state.unlocked).map(i => pill(String(i + 1), LEVEL_NAMES[i], 'small')).join('')}</div>` : ''}
+        <div class="tpills">${pill('ENTER', 'PLAY SOLO', 'green big')}${pill('O', 'play online', 'purple')}${state.canContinue ? pill('C', 'continue · ' + state.continueName, 'blue') : ''}${state.unlocked > 1 ? pill(state.unlocked > 3 ? '1–4' : '1–' + state.unlocked, 'pick level', '', null) : ''}${pill('M', 'mute')}</div>
+        ${state.unlocked > 1 ? `<div class="tlevels">${levelPicks(state.unlocked).map(([k, name]) => pill(k, name, 'small')).join('')}</div>` : ''}
         ${state.wins ? `<p class="wins">🏆 × ${state.wins}</p>` : ''}`;
     } else if (state.mode === 'online') {
       const list = state.lobbies.slice(0, 6).map((l, k) => `<button class="lob" data-key="Digit${k + 1}"><b>${k + 1}</b><code>${esc(l.code)}</code><span>${esc(l.host)}'s lobby</span><i>${l.n}/4 · ${l.started ? 'playing ' : 'waiting · '}${esc(l.levelName || '')}</i></button>`).join('');
@@ -238,7 +240,7 @@ export class HUD {
       }).join('');
       const n = g.slots.length;
       const hostBits = state.host
-        ? `<div class="pills lv">${[0, 1, 2].map(i => pill(String(i + 1), LEVEL_NAMES[i], i === state.level ? 'purple' : i < state.unlocked ? '' : 'off')).join('')}</div>
+        ? `<div class="pills lv">${[...[0, 1, 2].map(i => [String(i + 1), LEVEL_NAMES[i], i]), ...(state.unlocked > 3 ? [['4', `∞ Level ${state.unlocked}`, state.unlocked - 1]] : [])].map(([k, name, i]) => pill(k, name, i === state.level ? 'purple' : i < state.unlocked ? '' : 'off')).join('')}${state.level > 2 && state.level !== state.unlocked - 1 ? pill('·', `Level ${state.level + 1}`, 'purple') : ''}</div>
            <div class="pills">${pill('ENTER', n <= 1 ? 'start — solo is fine' : `start with ${n} players`, 'green')}${pill('ESC', 'leave')}</div>`
         : `<p class="wait">waiting for the host to start…</p><div class="pills">${pill('ESC', 'leave')}</div>`;
       html = `<div class="obox"><h2 data-t="LOBBY">LOBBY</h2><p class="dim">tell your friends this code · up to 4 players · they can also join mid-game</p>

@@ -424,13 +424,14 @@ final class Game: NSObject, SCNSceneRendererDelegate {
             if role == .guest { break }
             if doneTimer > 0.8 && (anyConfirm || (demo && doneTimer > 2)) {
                 hud.hidePanel()
-                if levelIndex + 1 < LevelData.names.count { startLevel(levelIndex + 1, fresh: false) } else { win() }
+                if levelIndex == 2 { win() } else { startLevel(levelIndex + 1, fresh: false) }   // after level 3: the ending, then endless levels
             }
         case .won:
             doneTimer += dt
             simulateScenery(dt)
             if Float.random(in: 0...1) < 0.1 { confetti(at: camTarget + V3(frand(-500, 500), 400, frand(-200, 200)), n: 4) }
-            if doneTimer > 1.5 && (anyConfirm || anyPause) { toTitle() }
+            if doneTimer > 1.5 && anyConfirm && role != .guest { hud.hidePanel(); startLevel(3, fresh: false) }
+            else if doneTimer > 1.5 && anyPause { toTitle() }
         }
         updateCamera(dt)
         updatePopups(dt)
@@ -467,7 +468,6 @@ final class Game: NSObject, SCNSceneRendererDelegate {
         state = .won
         doneTimer = 0
         save.wins += 1
-        save.run = nil
         save.store()
         sfx("win")
         audio.music.style = 4
@@ -506,6 +506,7 @@ final class Game: NSObject, SCNSceneRendererDelegate {
         else if input.wasPressed(Key.one) { startLevel(0, fresh: true) }
         else if input.wasPressed(Key.two), save.unlocked >= 2 { startLevel(1, fresh: true) }
         else if input.wasPressed(Key.three), save.unlocked >= 3 { startLevel(2, fresh: true) }
+        else if input.wasPressed(Key.four), save.unlocked > 3 { startLevel(save.unlocked - 1, fresh: true) }   // the furthest endless level
     }
 
     func simulateScenery(_ dt: Float) {
@@ -616,6 +617,10 @@ final class Game: NSObject, SCNSceneRendererDelegate {
                 break
             }
         }
+        // safety net: a jelly squeezed into another one can get flung to the moon; bring it back instead
+        for s in slots where s.body.flushing < 0 && (!s.body.c.x.isFinite || !s.body.c.y.isFinite || !s.body.c.z.isFinite || s.body.c.y > 4500 || simd_length(s.body.cVel) > 12000) {
+            respawn(s, ko: false)
+        }
         for s in slots where s.body.c.y < world.killY && s.body.flushing < 0 {
             s.falls += 1
             sfx("whoops")
@@ -673,7 +678,9 @@ final class Game: NSObject, SCNSceneRendererDelegate {
     /// Next to where the leader last stood on solid ground, dropping in from a little above.
     private func safeSpot(near L: Slot, for s: Slot) -> V3 {
         let base = L.lastSafe
-        for dz: Float in [s.index % 2 == 0 ? -80 : 80, 0, s.index % 2 == 0 ? 80 : -80] {
+        // every player gets their own lane, so two jellies are never dropped into each other
+        let lane = (Float(s.index) - 1.5) * 80
+        for dz: Float in [lane, -lane, 0] {
             let p = base + V3(-70, 0, dz)
             if let g = world.groundBelow(p.x, p.z, p.y + 60), g > base.y - 120, !world.solidAt(p + V3(0, 90, 0)) { return V3(p.x, g + 150, p.z) }
         }
@@ -739,15 +746,16 @@ final class Game: NSObject, SCNSceneRendererDelegate {
         let bonus = 1000 + eyes * 200
         score += bonus
         let got = score - levelStartScore
-        if levelIndex < save.best.count { save.best[levelIndex] = max(save.best[levelIndex], got) }
-        save.unlocked = max(save.unlocked, min(LevelData.names.count, levelIndex + 2))
-        if levelIndex + 1 < LevelData.names.count, let p1 = slots.first {
+        while save.best.count <= levelIndex { save.best.append(0) }
+        save.best[levelIndex] = max(save.best[levelIndex], got)
+        save.unlocked = max(save.unlocked, levelIndex + 2)
+        if let p1 = slots.first {
             save.run = SaveData.Run(level: levelIndex + 1, checkpoint: -1, score: score, eyes: max(2, p1.body.eyes.count), inventory: p1.inventory.map { $0.rawValue })
         }
         save.store()
         sfx("win")
-        hud.showDone(level: level, got: got, slots: slots, time: levelTime, last: levelIndex + 1 >= LevelData.names.count)
-        emit(["done", got, Int(levelTime), levelIndex + 1 >= LevelData.names.count ? 1 : 0,
+        hud.showDone(level: level, got: got, slots: slots, time: levelTime, last: levelIndex == 2)
+        emit(["done", got, Int(levelTime), levelIndex == 2 ? 1 : 0,
               slots.map { [$0.index, $0.collected, $0.bonks, $0.body.eyes.count, $0.falls, $0.flushOrder] }])
         hostFlush()
         for s in slots { s.body.place(at: V3(0, -5000, 0)) }
@@ -1293,7 +1301,8 @@ final class Game: NSObject, SCNSceneRendererDelegate {
             e.bodyNode.opacity = e.hurtFlash > 0 ? 0.5 : 1
             e.showStars(e.stun > 0 && e.kind != .boss)
             e.updateEyes(dt)
-            if e.pos.y < world.killY { e.dead = true; e.node.removeFromParentNode() }
+            // knocked off the edge: a boss still counts as beaten (otherwise the toilet never drops and the level soft-locks)
+            if e.pos.y < world.killY { if e.kind == .boss && !e.dead { e.pos.y = world.killY + 200; kill(e, by: nil) } else { e.dead = true; e.node.removeFromParentNode() } }
         }
         enemies.removeAll { $0.dead && $0.node.parent == nil }
     }

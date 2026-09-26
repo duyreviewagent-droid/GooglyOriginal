@@ -225,6 +225,7 @@ extension Game {
             }
             if role == .host {
                 for (k, key) in [Key.one, Key.two, Key.three].enumerated() where input.wasPressed(key) && save.unlocked > k { lobbyLevel = k; audio.play("click") }
+                if input.wasPressed(Key.four) && save.unlocked > 3 { lobbyLevel = save.unlocked - 1; audio.play("click") }
                 if input.wasPressed(Key.ret, Key.enter) || autoStartReady() { audio.play("click"); startLevel(lobbyLevel, fresh: true) }
             }
             hud.showLobby(code: lobbyCode, slots: slots, host: role == .host, level: lobbyLevel, unlocked: save.unlocked, status: status, mySeat: mySeat)

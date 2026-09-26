@@ -9,7 +9,7 @@ extension Game {
         let b = s.body
         var c = Player.Controls()
         c.move = V2(1, clampf((Float(s.index) * 60 - 90 - b.c.z) / 150, -0.6, 0.6))
-        if goalVisible && abs(level.goal.x - b.c.x) < 700 {
+        if goalVisible && abs(level.goal.x - b.c.x) < 1600 {
             // home in on the golden toilet
             let d = level.goal - b.c
             c.move = V2(d.x, d.z).norm
@@ -42,7 +42,8 @@ extension Game {
             else if wall || (pit && !fanAhead) { a.jumpPressed = true }
             else if Float.random(in: 0...1) < 0.004 { a.jumpPressed = true }
         }
-        if b.inFan { c.move.x = b.c.y > 560 ? 1 : 0.2 }
+        // ride the fan most of the way up before drifting across (relative to that fan, so raised fans work too)
+        if b.inFan { let top = world.fans.first { b.c.x > $0.lo.x - 40 && b.c.x < $0.hi.x + 40 }?.hi.y ?? 620; c.move.x = b.c.y > top - 60 ? 1 : 0.2 }
         a.ctl = c
         a.fire = demoTarget(s) != nil && Float.random(in: 0...1) < 0.12
         a.teleport = s.behind && Float.random(in: 0...1) < 0.05
@@ -167,7 +168,12 @@ extension Game {
         check("pupils stay inside", worst <= g.R - g.r + 0.01, String(format: "%.2f / %.2f", worst, g.R - g.r))
 
         // level sanity
-        for i in 0..<LevelData.names.count {
+        let argInt = { (k: String, d: Int) -> Int in CommandLine.arguments.first { $0.hasPrefix(k) }.flatMap { Int($0.dropFirst(k.count)) } ?? d }
+        if let dump = CommandLine.arguments.first(where: { $0.hasPrefix("--dumplevels=") }).flatMap({ Int($0.dropFirst(13)) }) {
+            // one line per level, compared against server/test/levels.mjs so Mac and browser build the same levels
+            for i in 0..<dump { print("LEVEL " + LevelData.fingerprint(LevelData.make(i), i)) }
+        }
+        for i in 0..<argInt("--layouts=", 60) {
             let L = LevelData.make(i)
             let lw = World(); lw.solids = L.solids
             var problems: [String] = []
@@ -184,7 +190,8 @@ extension Game {
         if CommandLine.arguments.contains("--bot") {
             let n = max(1, min(4, Int(CommandLine.arguments.first { $0.hasPrefix("--players=") }?.dropFirst(10) ?? "1") ?? 1))
             for sc in [Scheme.keysA, .keysB, .pad(0), .pad(1)].prefix(n) { join(sc) }
-            for i in 0..<LevelData.names.count {
+            let from = argInt("--botfrom=", 1) - 1, to = argInt("--botto=", 3)
+            for i in from..<max(from + 1, to) {
                 demo = true
                 startLevel(i, fresh: true)
                 for s in slots { s.body.setEyes(10) }
@@ -195,12 +202,12 @@ extension Game {
                     tick(tt)
                     for s in slots { s.body.invuln = 1 }
                     best = max(best, slots.map { $0.body.c.x }.max() ?? 0)
-                    if CommandLine.arguments.contains("--botlog") && Int(tt * 60) % 60 == 0 {
-                        print(String(format: "  t=%.0f c=(%.0f,%.0f,%.0f) grounded=%d charging=%d hold=%.2f up=%.2f", tt, player.c.x, player.c.y, player.c.z, player.grounded ? 1 : 0, player.charging ? 1 : 0, slots.first?.demoHold ?? 0, player.upright))
+                    if CommandLine.arguments.contains("--botlog") && Int(tt * 60) % (CommandLine.arguments.contains("--botfine") ? 6 : 60) == 0 {
+                        print(String(format: "  t=%.0f c=(%.0f,%.0f,%.0f) grounded=%d charging=%d hold=%.2f up=%.2f", tt, player.c.x, player.c.y, player.c.z, player.grounded ? 1 : 0, player.charging ? 1 : 0, slots.first?.demoHold ?? 0, player.upright) + (slots.count > 1 ? " all " + slots.map { String(format: "(%.0f,%.0f,%.0f)", $0.body.c.x, $0.body.c.y, $0.body.c.z) }.joined(separator: " ") + " goalVis \(goalVisible) flushT \(flushT)" : ""))
                     }
                     if state != .playing { break }
                 }
-                print(String(format: "INFO bot level %d (%d players): reached x=%.0f of goal %.0f, state %@, falls %d, teleports %d", i + 1, slots.count, best, level.goal.x, "\(state)", slots.reduce(0) { $0 + $1.falls }, slots.reduce(0) { $0 + $1.teleports }))
+                print(String(format: "INFO bot level %d (%d players): reached x=%.0f of goal %.0f, state %@, falls %d, teleports %d", i + 1, slots.count, best, level.goal.x, "\(state)", slots.reduce(0) { $0 + $1.falls }, slots.reduce(0) { $0 + $1.teleports }) + (slots.count > 1 ? "  at " + slots.map { String(format: "(%.0f,%.0f)", $0.body.c.x, $0.body.c.y) }.joined(separator: " ") + (flushT >= 0 ? " flushing" : "") + (boss.map { $0.dead ? " boss dead" : " boss hp \(Int($0.hp))" } ?? "") : ""))
             }
             demo = false
         }

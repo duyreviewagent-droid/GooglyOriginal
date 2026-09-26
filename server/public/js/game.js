@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { V3, clamp, wrapAngle, frand, pick } from './util.js';
 import { World } from './world.js';
-import { makeLevel, LEVEL_NAMES } from './levels.js';
+import { makeLevel, LEVEL_NAMES, levelName } from './levels.js';
 import { Player, PLAYER_COLORS, PLAYER_NAMES, MAX_EYES } from './player.js';
 import { Pickup, Projectile, Enemy, Particle, Shockwave, JUNK, JUNK_INFO, ENEMY_KINDS } from './things.js';
 import { makeFlag, raiseFlag, makeToilet, makeCrown, tickModels } from './models.js';
@@ -238,7 +238,7 @@ export class Game {
   }
   win() {
     this.state = 'won'; this.doneTimer = 0;
-    this.save.wins++; this.save.run = null; this.storeSave();
+    this.save.wins++; this.storeSave();
     this.audio.play('win'); this.audio.setMusic(4);
     this.hud.showWin(this.score, this.slots.length);
     this.emit(['win', this.score]); this.hostFlush();
@@ -269,13 +269,14 @@ export class Game {
         if (this.role === 'guest') break;
         if (this.doneTimer > 0.8 && (anyConfirm || (this.demo && this.doneTimer > 2))) {
           this.hud.hidePanel();
-          if (this.levelIndex + 1 < LEVEL_NAMES.length) this.startLevel(this.levelIndex + 1, false); else this.win();
+          if (this.levelIndex === 2) this.win(); else this.startLevel(this.levelIndex + 1, false);   // after level 3: the ending, then endless levels
         }
         break;
       case 'won':
         this.doneTimer += dt; this.simulateScenery(dt);
         if (Math.random() < 0.1) this.confetti(this.camTarget.add(new V3(frand(-500, 500), 400, frand(-200, 200))), 4, false);
-        if (this.doneTimer > 1.5 && (anyConfirm || anyPause)) this.toTitle();
+        if (this.doneTimer > 1.5 && anyConfirm && this.role !== 'guest') { this.hud.hidePanel(); this.startLevel(3, false); }
+        else if (this.doneTimer > 1.5 && anyPause) this.toTitle();
         break;
     }
     this.updateCamera(dt);
@@ -304,7 +305,7 @@ export class Game {
     return {
       mode: this.titleMode, unlocked: this.save.unlocked, wins: this.save.wins,
       countdown: this.titleCountdown != null ? Math.ceil(this.titleCountdown) : null, joined: this.slots.map(s => ({ index: s.index, label: s.scheme.label })),
-      canContinue: !!this.save.run, continueName: this.save.run ? LEVEL_NAMES[this.save.run.level] : '',
+      canContinue: !!this.save.run, continueName: this.save.run ? `Level ${this.save.run.level + 1} · ${levelName(this.save.run.level)}` : '',
       free: this.freeSchemes().map(s => ({ join: s.join, label: s.label })), players: this.slots.map(s => s.index + s.scheme.id),
       status: this.netStatus(), open: this.net?.status === 'open', lobbies: this.lobbyList.map(l => ({ code: l.code, host: l.host, n: l.n, started: l.started, levelName: l.levelName })),
       error: this.netError, code: this.codeEntry, name: this.name, host: this.role === 'host', level: this.lobbyLevel, lobbyCode: this.lobbyCode,
@@ -358,6 +359,7 @@ export class Game {
       if (input.wasPressed('KeyO')) return this.titleAction('online');
       if (input.wasPressed('KeyC') && this.save.run) return this.titleAction('continue');
       ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (input.wasPressed(k) && this.save.unlocked > i) this.titleAction('level' + i); });
+      if (input.wasPressed('Digit4') && this.save.unlocked > 3) this.titleAction('level' + (this.save.unlocked - 1));   // the furthest endless level
     } else this.updateOnlineTitle(dt);
     this.hud.drawTitle(this.titleState());
   }
@@ -436,6 +438,8 @@ export class Game {
       const s = this.slots.find(s => s.body.ko <= 0 && s.body.c.sub(g).len < 85);
       if (s) this.startFlush(s);
     }
+    // safety net: a jelly squeezed into another one can get flung to the moon; bring it back instead
+    for (const s of this.slots) { const c = s.body.c; if (s.body.flushing < 0 && (!Number.isFinite(c.x + c.y + c.z) || c.y > 4500 || s.body.cVel.len > 12000)) this.respawn(s, false); }
     for (const s of this.slots) if (s.body.c.y < this.world.killY && s.body.flushing < 0) {
       s.falls++;
       this.sfx('whoops');
@@ -478,7 +482,8 @@ export class Game {
   }
   safeSpot(L, s) {
     const base = L.lastSafe;
-    for (const dz of [s.index % 2 === 0 ? -80 : 80, 0, s.index % 2 === 0 ? 80 : -80]) {
+    const lane = (s.index - 1.5) * 80;   // every player gets their own lane, so two jellies are never dropped into each other
+    for (const dz of [lane, -lane, 0]) {
       const p = base.add(new V3(-70, 0, dz));
       const g = this.world.groundBelow(p.x, p.z, p.y + 60);
       if (g !== null && g > base.y - 120 && !this.world.solidAt(p.add(new V3(0, 90, 0)))) return new V3(p.x, g + 150, p.z);
@@ -546,12 +551,12 @@ export class Game {
     this.score += 1000 + eyes * 200;
     const got = this.score - this.levelStartScore;
     this.save.best[this.levelIndex] = Math.max(this.save.best[this.levelIndex] || 0, got);
-    this.save.unlocked = Math.max(this.save.unlocked, Math.min(LEVEL_NAMES.length, this.levelIndex + 2));
+    this.save.unlocked = Math.max(this.save.unlocked, this.levelIndex + 2);
     const p1 = this.slots[0];
-    if (this.levelIndex + 1 < LEVEL_NAMES.length && p1) this.save.run = { level: this.levelIndex + 1, checkpoint: -1, score: this.score, eyes: Math.max(2, p1.body.eyes.length), inventory: [...p1.inventory] };
+    if (p1) this.save.run = { level: this.levelIndex + 1, checkpoint: -1, score: this.score, eyes: Math.max(2, p1.body.eyes.length), inventory: [...p1.inventory] };
     this.storeSave();
     this.audio.play('win');
-    const last = this.levelIndex + 1 >= LEVEL_NAMES.length;
+    const last = this.levelIndex === 2;
     this.hud.showDone(this.level, got, this.slots, this.levelTime, last);
     this.emit(['done', got, Math.floor(this.levelTime), last ? 1 : 0, this.slots.map(s => [s.index, s.collected, s.bonks, s.body.eyes.length, s.falls, s.flushOrder])]);
     this.hostFlush();
@@ -998,7 +1003,8 @@ export class Game {
       }
       e.pose(this.time);
       e.updateEyes(dt);
-      if (e.pos.y < this.world.killY) { e.dead = true; this.worldNode.remove(e.node); }
+      // knocked off the edge: a boss still counts as beaten (otherwise the toilet never drops and the level soft-locks)
+      if (e.pos.y < this.world.killY) { if (e.kind === 'boss' && !e.dead) { e.pos.y = this.world.killY + 200; this.kill(e, null); } else { e.dead = true; this.worldNode.remove(e.node); } }
     }
     this.enemies = this.enemies.filter(e => !e.dead);
   }
@@ -1359,6 +1365,7 @@ export class Game {
       }
       if (this.role === 'host') {
         ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (input.wasPressed(k) && this.save.unlocked > i) this.lobbyLevel = i; });
+        if (input.wasPressed('Digit4') && this.save.unlocked > 3) this.lobbyLevel = this.save.unlocked - 1;
         if (input.wasPressed('Enter', 'NumpadEnter') || (this.autoHost && this.slots.length >= this.autoPlayers)) { this.audio.play('click'); this.startLevel(this.lobbyLevel, true); }
       }
     }
@@ -1612,7 +1619,7 @@ export class Game {
   demoActions(s) {
     const a = { move: { x: 1, y: clamp((s.index * 60 - 90 - s.body.c.z) / 150, -0.6, 0.6) }, squish: false, jumpPressed: false, fire: false, fireHeld: false, mouseAim: false, honk: false, teleport: false };
     const b = s.body, w = this.world;
-    if (this.goalVisible && Math.abs(this.level.goal.x - b.c.x) < 700) {
+    if (this.goalVisible && Math.abs(this.level.goal.x - b.c.x) < 1600) {
       const d = this.level.goal.sub(b.c), l = Math.hypot(d.x, d.z) || 1;
       a.move = { x: d.x / l, y: d.z / l };
       if (this.boss && !this.boss.dead) a.move = { x: 0, y: 0 };
@@ -1632,7 +1639,7 @@ export class Game {
       else if (wall || (pit && !fanAhead)) a.jumpPressed = true;
       else if (Math.random() < 0.004) a.jumpPressed = true;
     }
-    if (b.inFan) a.move.x = b.c.y > 560 ? 1 : 0.2;
+    if (b.inFan) { const fan = w.fans.find(fn => b.c.x > fn.lo.x - 40 && b.c.x < fn.hi.x + 40); a.move.x = b.c.y > (fan ? fan.hi.y : 620) - 60 ? 1 : 0.2; }   // ride the fan up first
     a.fire = !!this.demoTarget(s) && Math.random() < 0.12;
     a.teleport = s.behind && Math.random() < 0.05;
     return a;
@@ -1653,7 +1660,7 @@ export class Game {
     if (q.get('bot')) this.demo = true;
     if (q.get('host')) { this.autoHost = true; this.autoPlayers = +q.get('host') || 2; this.openOnline(); }
     if (q.get('join')) { this.autoJoin = q.get('join').toUpperCase(); this.openOnline(); }
-    if (q.get('level')) { const n = +q.get('players') || 1; for (const sc of [Schemes.keysA, Schemes.keysB, Schemes.pad(0), Schemes.pad(1)].slice(0, n)) this.join(sc); this.startLevel(clamp(+q.get('level') - 1, 0, 2), true); }
+    if (q.get('level')) { const n = +q.get('players') || 1; for (const sc of [Schemes.keysA, Schemes.keysB, Schemes.pad(0), Schemes.pad(1)].slice(0, n)) this.join(sc); this.startLevel(clamp(+q.get('level') - 1, 0, 9999), true); }
     if (q.get('x') && this.slots.length) { const x = +q.get('x'); const y = this.world.groundBelow(x, 0, 3000) ?? 0; this.slots.forEach((s, i) => s.body.place(new V3(x + (i % 2) * 90, y + 70, Math.floor(i / 2) * 100 - 50))); this.camTarget = this.player.c.clone(); }
     if (q.get('junk')) for (const s of this.slots) s.inventory = [...JUNK.filter(j => j !== 'pea'), 'duck', 'duck', 'toast'];
   }

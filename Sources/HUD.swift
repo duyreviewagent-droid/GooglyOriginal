@@ -417,14 +417,17 @@ final class HUD {
         t.run(.repeatForever(.sequence([.scale(to: 1.06, duration: 0.4), .scale(to: 1, duration: 0.4)])))
         panel.addChild(t)
         let who = players > 1 ? "Your googly gang" : "You"
-        for (i, s) in ["\(who) fired the CEO of Cube Corp and flushed", "three golden toilets. Officially the googliest alive.", "", "FINAL SCORE  \(score)"].enumerated() {
+        for (i, s) in ["\(who) fired the CEO of Cube Corp and flushed", "three golden toilets. …but the toilets never end!", "", "SCORE  \(score)"].enumerated() {
             let l = lbl(s, size: i == 3 ? 28 : 19, color: i == 3 ? hex(0x8dffa0) : .white, font: i == 3 ? uiFont : uiFontMed)
             l.position = CGPoint(x: 0, y: 20 - CGFloat(i) * 32)
             panel.addChild(l)
         }
-        let go = keyPill("ENTER", "back to the title")
-        go.position = CGPoint(x: 0, y: -190)
+        let go = keyPill("ENTER", "keep going · endless levels")
+        go.position = CGPoint(x: -120, y: -190)
         panel.addChild(go)
+        let back = keyPill("ESC", "title", color: hex(0x2b2f3a))
+        back.position = CGPoint(x: 190, y: -190)
+        panel.addChild(back)
     }
 
     // MARK: title
@@ -483,8 +486,8 @@ final class HUD {
         let solo = keyPill("ENTER", "PLAY SOLO")
         solo.setScale(1.25)
         var pills: [SKNode] = [solo, keyPill("O", "play online", color: hex(0x7a3fd1))]
-        if let r = save.run { pills.append(keyPill("C", "continue · \(LevelData.names[r.level])", color: hex(0x2b5fb8))) }
-        if save.unlocked > 1 { pills.append(keyPill("1–\(save.unlocked)", "pick a level", color: hex(0x2b2f3a))) }
+        if let r = save.run { pills.append(keyPill("C", "continue · Level \(r.level + 1)", color: hex(0x2b5fb8))) }
+        if save.unlocked > 1 { pills.append(keyPill(save.unlocked > 3 ? "1–4" : "1–\(save.unlocked)", save.unlocked > 3 ? "pick a level · 4 = ∞ level \(save.unlocked)" : "pick a level", color: hex(0x2b2f3a))) }
         pills.append(keyPill("M", "mute", color: hex(0x2b2f3a)))
         let gap: CGFloat = 16
         let tw = pills.reduce(0) { $0 + $1.calculateAccumulatedFrame().width } + gap * CGFloat(pills.count - 1)
@@ -629,12 +632,14 @@ final class HUD {
             b.addChild(r)
         }
         if host {
-            for k in 0..<3 {
-                let ok = k < unlocked
-                let p = keyPill("\(k + 1)", LevelData.names[k], color: k == level ? hex(0x7a3fd1) : ok ? hex(0x2b2f3a) : hex(0x1a1a1a))
+            let picks = unlocked > 3 ? 4 : 3
+            for k in 0..<picks {
+                let lv = k == 3 ? unlocked - 1 : k
+                let ok = lv < unlocked
+                let p = keyPill("\(k + 1)", k == 3 ? "∞ Level \(unlocked)" : LevelData.names[k], color: lv == level ? hex(0x7a3fd1) : ok ? hex(0x2b2f3a) : hex(0x1a1a1a))
                 p.setScale(0.62)
                 p.alpha = ok ? 1 : 0.4
-                p.position = CGPoint(x: CGFloat(k - 1) * 240, y: -86)
+                p.position = CGPoint(x: (CGFloat(k) - CGFloat(picks - 1) / 2) * (picks == 4 ? 200 : 240), y: -86)
                 b.addChild(p)
             }
             let go = keyPill("ENTER", slots.count <= 1 ? "start — solo is fine" : "start with \(slots.count) players")

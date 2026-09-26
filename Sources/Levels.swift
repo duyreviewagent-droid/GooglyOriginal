@@ -107,7 +107,20 @@ final class LevelData {
 
     static let names = ["The Backyard of Destiny", "The Desert of Mild Inconvenience", "Cube Corp HQ"]
 
+    static func backyardTheme() -> Theme { Theme(skyTop: hex(0x5fb8ff), skyBottom: hex(0xd8f1ff), ground: hex(0x8a5a36), groundEdge: hex(0x5a3820),
+                                       groundTop: hex(0x5cc94a), platform: hex(0xb07a48), platformTop: hex(0x74d65e),
+                                       hillFar: hex(0x9fd9a0), hillNear: hex(0x6cc070), decor: ["🌷", "🌻", "🌼", "🍄", "🌳", "🌿", "🪨"], music: 0) }
+    static func desertTheme() -> Theme { Theme(skyTop: hex(0xff9d5c), skyBottom: hex(0xffe6a6), ground: hex(0xd9a35f), groundEdge: hex(0x9a6a33),
+                                       groundTop: hex(0xf2c77e), platform: hex(0xb9854a), platformTop: hex(0xe8b96c),
+                                       hillFar: hex(0xf0bf86), hillNear: hex(0xe0a568), decor: ["🌵", "🌵", "🪨", "🦴", "🌵", "🐚"], music: 1,
+                                       topTex: Tex.sand, sideTex: Tex.sandstone, platTopTex: Tex.sand, platSideTex: Tex.wood, props: 1) }
+    static func officeTheme() -> Theme { Theme(skyTop: hex(0x3f6fb8), skyBottom: hex(0xf2c9a0), ground: hex(0x8a90a6), groundEdge: hex(0x4b5263),
+                                       groundTop: hex(0x3d6fb0), platform: hex(0x8d6e52), platformTop: hex(0xc9a27a),
+                                       hillFar: hex(0x9aa4d6), hillNear: hex(0x7f8cc4), decor: ["🪴", "🗄️", "🖨️", "🪴", "📦", "🧯"], music: 2,
+                                       topTex: Tex.carpet, sideTex: Tex.concrete, platTopTex: Tex.wood, platSideTex: Tex.concrete, props: 2) }
+
     static func make(_ i: Int) -> LevelData {
+        if i >= 3 { return endless(i) }
         switch i {
         case 1: return desert()
         case 2: return office()
@@ -116,9 +129,7 @@ final class LevelData {
     }
 
     static func backyard() -> LevelData {
-        let L = LevelData(theme: Theme(skyTop: hex(0x5fb8ff), skyBottom: hex(0xd8f1ff), ground: hex(0x8a5a36), groundEdge: hex(0x5a3820),
-                                       groundTop: hex(0x5cc94a), platform: hex(0xb07a48), platformTop: hex(0x74d65e),
-                                       hillFar: hex(0x9fd9a0), hillNear: hex(0x6cc070), decor: ["🌷", "🌻", "🌼", "🍄", "🌳", "🌿", "🪨"], music: 0))
+        let L = LevelData(theme: backyardTheme())
         L.name = names[0]; L.subtitle = "Level 1"
         L.minX = -300; L.maxX = 7700
         L.ground(-600, 1500)
@@ -176,10 +187,7 @@ final class LevelData {
     }
 
     static func desert() -> LevelData {
-        let L = LevelData(theme: Theme(skyTop: hex(0xff9d5c), skyBottom: hex(0xffe6a6), ground: hex(0xd9a35f), groundEdge: hex(0x9a6a33),
-                                       groundTop: hex(0xf2c77e), platform: hex(0xb9854a), platformTop: hex(0xe8b96c),
-                                       hillFar: hex(0xf0bf86), hillNear: hex(0xe0a568), decor: ["🌵", "🌵", "🪨", "🦴", "🌵", "🐚"], music: 1,
-                                       topTex: Tex.sand, sideTex: Tex.sandstone, platTopTex: Tex.sand, platSideTex: Tex.wood, props: 1))
+        let L = LevelData(theme: desertTheme())
         L.name = names[1]; L.subtitle = "Level 2"
         L.minX = -300; L.maxX = 8400
         L.ground(-600, 1200)
@@ -236,10 +244,7 @@ final class LevelData {
     }
 
     static func office() -> LevelData {
-        let L = LevelData(theme: Theme(skyTop: hex(0x3f6fb8), skyBottom: hex(0xf2c9a0), ground: hex(0x8a90a6), groundEdge: hex(0x4b5263),
-                                       groundTop: hex(0x3d6fb0), platform: hex(0x8d6e52), platformTop: hex(0xc9a27a),
-                                       hillFar: hex(0x9aa4d6), hillNear: hex(0x7f8cc4), decor: ["🪴", "🗄️", "🖨️", "🪴", "📦", "🧯"], music: 2,
-                                       topTex: Tex.carpet, sideTex: Tex.concrete, platTopTex: Tex.wood, platSideTex: Tex.concrete, props: 2))
+        let L = LevelData(theme: officeTheme())
         L.name = names[2]; L.subtitle = "Level 3"
         L.minX = -300; L.maxX = 8200
         L.ground(-600, 1500)
@@ -286,5 +291,163 @@ final class LevelData {
         L.goalHidden = true
         L.wall(8200, 8500, top: 420)
         return L
+    }
+}
+
+// MARK: - endless levels (level 4 onwards)
+// An exact port of endless() in server/public/js/levels.js: every random choice is rng.int and every coordinate is
+// a whole number, so the Mac (Float) and the browser (Double) build the same level and can share online lobbies.
+extension LevelData {
+    static let eAdj = ["Wobbly", "Suspicious", "Mildly Haunted", "Extremely Beige", "Slightly Sticky", "Unreasonably Long", "Very Serious", "Crunchy",
+                       "Forbidden", "Soggy", "Totally Normal", "Emotional", "Overcaffeinated", "Sneaky", "Lukewarm", "Bouncy"]
+    static let ePlace = [["Backyard", "Garden", "Lawn", "Hedge Maze", "Vegetable Patch", "Flowerbed"],
+                         ["Desert", "Dunes", "Canyon", "Mesa", "Oasis", "Tumbleweed Highway"],
+                         ["Cube Corp Floor", "Break Room", "Server Room", "Cubicle Farm", "Mail Room", "Stationery Cupboard"]]
+    static let eOf = ["of Destiny", "of Doom", "of Snacks", "of Paperwork", "of Mild Peril", "of Lost Socks", "of No Return", "of Wet Floors", "of Toast", "", "", ""]
+    static let eQuips = ["Still going?\nRespect.", "Level ${N}.\nThe toilets never end.", "Beware of\nthe cube", "Snacks ahead\n(probably)", "Jump now,\nthink later",
+                         "You're doing\namazing, jelly", "This sign is\nload-bearing", "Keep off\nthe grass", "Warning:\nmild wobbling", "Do not lick\nthe toaster"]
+    static let eJunk: [Junk] = [.duck, .toast, .melon, .fish, .sock, .chicken, .banana, .cheese, .bowling]
+    static func isBossLevel(_ i: Int) -> Bool { i == 2 || (i >= 3 && (i + 1) % 5 == 0) }
+    static func levelName(_ i: Int) -> String { i < 3 ? names[i] : endlessName(i) }
+    static func endlessName(_ i: Int) -> String {
+        var g = RNG(UInt64(7919 * i + 13))
+        let t = i % 3
+        let adj = eAdj[g.int(eAdj.count)], place = ePlace[t][g.int(ePlace[t].count)], of = eOf[g.int(eOf.count)]
+        if isBossLevel(i) { return "\(place): The Cube Strikes Back" }
+        return "The \(adj) \(place)" + (t == 2 && place == "Cube Corp Floor" ? " \(i + 1)" : "") + (of.isEmpty ? "" : " " + of)
+    }
+    static func endless(_ i: Int) -> LevelData {
+        let t = i % 3
+        let L = LevelData(theme: [backyardTheme(), desertTheme(), officeTheme()][t])
+        var g = RNG(UInt64(7919 * i + 13))
+        L.name = endlessName(i); L.subtitle = "Level \(i + 1)"
+        _ = g.int(99); _ = g.int(99); _ = g.int(99)
+        let n = i - 2, hard = min(10, n)
+        let boss = isBossLevel(i)
+        var seed = UInt64(100 + i * 50)
+        func F(_ v: Int) -> Float { Float(v) }
+        func junk() -> Junk { eJunk[g.int(eJunk.count)] }
+        func deco(_ x0: Int, _ x1: Int, _ y: Int) { L.deco(F(x0), F(x1), y: F(y), every: 120, seed: seed); seed += 1 }
+        func quip() -> String { eQuips[g.int(eQuips.count)].replacingOccurrences(of: "${N}", with: String(i + 1)) }
+        func foes(_ x0: Int, _ x1: Int, _ y: Int, _ count: Int) {
+            for k in 0..<max(0, count) {
+                let x = x0 + 60 + (x1 - x0 - 120) * (k + 1) / (count + 1) + 10 * g.int(7) - 30
+                let r = g.int(10)
+                if r < 2 + hard / 3 { L.enemy(.toaster, F(x), F(y)) }
+                else if r < 4 + hard / 3 { L.enemy(.pigeon, F(x), F(y + 380 + 10 * g.int(5))) }
+                else { L.enemy(.cube, F(x), F(y)) }
+            }
+        }
+        L.ground(-600, 900); deco(-500, 900, 0)
+        L.sign("LEVEL \(i + 1)\n" + quip(), 150)
+        L.row(junk(), 350, 90, 3 + g.int(3))
+        var x = 900, y = 0, lastCheck = 0, lastEye = 0
+        let end = 6600 + 260 * min(n, 20)
+        while x < end {
+            var k = g.int(12)
+            if y >= 400 && (k == 5 || k == 7 || k == 8) { k = 9 }
+            if y <= 0 && k == 9 { k = 0 }
+            let w = 600 + 50 * g.int(9)
+            if x - lastCheck > 1500 && (k <= 1 || k == 5 || k == 7 || k == 8 || k == 10) { L.check(F(x + 60), F(y)); lastCheck = x }
+            if k <= 1 {
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y)
+                foes(x, x + w, y, 1 + g.int(1 + (hard + 2) / 3))
+                L.row(junk(), F(x + 100), F(y + 90), 2 + g.int(4), gap: 55)
+                x += w
+            } else if k == 2 {
+                let gap = 120 + 10 * g.int(4 + hard)
+                let dy = gap > 200 ? 10 * g.int(9) - 60 : 10 * g.int(15) - 80
+                L.arc(junk(), F(x + 10), F(y + 110), 3, gap: F(gap / 3), h: 50)
+                y = max(0, y + dy); x += gap
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y)
+                if g.int(2) != 0 { foes(x, x + w, y, 1) }
+                x += w
+            } else if k == 3 {
+                let pit = 600 + 20 * g.int(9)
+                L.plat(F(x + 120), F(y + 60), w: 160); L.plat(F(x + pit - 280), F(y + 100), w: 160)
+                L.row(junk(), F(x + 140), F(y + 130), 3, gap: 45)
+                if x - lastEye > 2500 { L.eye(F(x + pit - 200), F(y + 190)); lastEye = x }
+                x += pit; y = max(0, y + 10 * g.int(9) - 40)
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y); x += w
+            } else if k == 4 {
+                L.mover(F(x + 50), F(y + 20), w: 160, dx: 110, speed: 1.1 + 0.05 * Float(g.int(1 + hard)))
+                L.row(junk(), F(x + 100), F(y + 110), 2, gap: 60)
+                x += 420; L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y); foes(x, x + w, y, g.int(2)); x += w
+            } else if k == 5 && y <= 300 {
+                L.ground(F(x), F(x + 900), y: F(y)); deco(x, x + 900, y)
+                L.tramp(F(x + 250), F(y + 14)); L.plat(F(x + 370), F(y + 560), w: 320)
+                L.item(g.int(2) != 0 ? .melon : .bowling, F(x + 450), F(y + 620)); L.row(junk(), F(x + 500), F(y + 620), 3)
+                if x - lastEye > 2000 { L.eye(F(x + 620), F(y + 630)); lastEye = x }
+                if g.int(2) != 0 { L.enemy(.pigeon, F(x + 700), F(y + 420)) }
+                x += 900
+            } else if k == 6 {
+                L.fan(F(x + 20), F(x + 240), bottom: F(y - 700), top: F(y + 620), power: 3500)
+                L.plat(F(x + 270), F(y + 470), w: 480)
+                L.row(junk(), F(x + 330), F(y + 540), 4)
+                if x - lastEye > 2000 { L.eye(F(x + 560), F(y + 560)); lastEye = x }
+                x += 750; L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y); x += w
+            } else if k == 7 && y <= 300 {
+                L.ground(F(x), F(x + 800), y: F(y)); deco(x, x + 600, y)
+                L.mover(F(x + 400), F(y + 190), w: 150, dy: 190, speed: 1.1)
+                y += 390; x += 600
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y); foes(x, x + w, y, 1 + g.int(2)); x += w
+            } else if k == 8 && y <= 400 {
+                L.ground(F(x), F(x + 850), y: F(y))
+                L.plat(F(x + 100), F(y + 100), w: 180, h: 100); L.plat(F(x + 350), F(y + 195), w: 180, h: 195); L.plat(F(x + 600), F(y + 290), w: 200, h: 290)
+                L.row(junk(), F(x + 380), F(y + 280), 2, gap: 60)
+                y += 290; x += 800
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y); foes(x, x + w, y, g.int(2)); x += w
+            } else if k == 9 {
+                let y2 = max(0, y - 150 - 50 * g.int(4))
+                L.ramp(F(x), F(x + 300), F(y), F(y2)); y = y2; x += 300
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y); foes(x, x + w, y, 1); x += w
+            } else if k == 10 {
+                L.ground(F(x), F(x + w), y: F(y), ice: true)
+                foes(x, x + w, y, 1 + g.int(2))
+                L.row(junk(), F(x + 80), F(y + 90), 4 + g.int(4), gap: 65)
+                x += w
+            } else {
+                if y == 0 && g.int(2) != 0 { L.ramp(F(x), F(x + 300), 0, 150); y = 150; x += 300 }
+                L.ground(F(x), F(x + w), y: F(y)); deco(x, x + w, y)
+                let np = 1 + g.int(1 + (hard + 3) / 4)
+                for p in 0..<np { L.enemy(.pigeon, F(x + 150 + 200 * p), F(y + 380 + 10 * g.int(5))) }
+                L.row(junk(), F(x + 120), F(y + 90), 3, gap: 60)
+                x += w
+            }
+            if g.int(6) == 0 { L.sign(quip(), F(x - 200), F(y)) }
+        }
+        if boss {
+            if y > 0 { L.ramp(F(x), F(x + 300), F(y), 0); x += 300; y = 0 }
+            L.ground(F(x), F(x + 2700)); deco(x, x + 900, 0)
+            L.check(F(x + 120), 0)
+            L.row(.melon, F(x + 250), 90, 2, gap: 250); L.row(.chicken, F(x + 500), 90, 3)
+            L.sign("MEGA CUBE\nis back. And angry.", F(x + 900))
+            L.bossTrigger = F(x + 1220)
+            L.enemy(.boss, F(x + 1970), 0)
+            L.goal = V3(F(x + 1870), 0, 0); L.goalHidden = true
+            L.wall(F(x + 2700), F(x + 3000), top: 420)
+            L.maxX = F(x + 2700)
+        } else {
+            L.ground(F(x), F(x + 1300), y: F(y)); deco(x, x + 1300, y)
+            L.check(F(x + 120), F(y))
+            L.row(.cheese, F(x + 300), F(y + 90), 2, gap: 80)
+            L.goal = V3(F(x + 1000), F(y), 0)
+            L.wall(F(x + 1300), F(x + 1600), top: F(y + 270))
+            L.maxX = F(x + 1300)
+        }
+        L.minX = -300
+        return L
+    }
+}
+
+extension LevelData {
+    /// A compact summary of a level (names, counts and integer coordinate sums) for the Mac ↔ browser parity check.
+    static func fingerprint(_ L: LevelData, _ i: Int) -> String {
+        var sx = 0, sy = 0
+        for s in L.solids { for p in s.pts { sx += Int(p.x.rounded()); sy += Int(p.y.rounded()) } }
+        let kinds = L.enemies.map { e -> String in switch e.0 { case .cube: return "c"; case .pigeon: return "p"; case .toaster: return "t"; case .boss: return "B" } }.joined()
+        var px = 0; for p in L.pickups { px += Int(p.1.x.rounded()) + Int(p.1.y.rounded()) }
+        var ex = 0; for e in L.enemies { ex += Int(e.1.x.rounded()) }
+        return "\(i + 1)|\(L.name)|s\(L.solids.count):\(sx):\(sy)|f\(L.fans.count)|p\(L.pickups.count):\(px)|e\(kinds):\(ex)|k\(L.checkpoints.count)|g\(Int(L.goal.x)),\(Int(L.goal.y))|x\(Int(L.maxX))|signs\(L.signs.count)"
     }
 }

@@ -96,7 +96,149 @@ const THEMES = {
 // the decor list order must match the Mac app's emoji lists (RNG picks by index)
 for (const t of Object.values(THEMES)) t.decor = t.decorOrder;
 
-export function makeLevel(i) { return i === 1 ? desert() : i === 2 ? office() : backyard(); }
+export function makeLevel(i) { return i >= 3 ? endless(i) : i === 1 ? desert() : i === 2 ? office() : backyard(); }
+/** Name of level i (0-based) without building it. */
+export function levelName(i) { return i < 3 ? LEVEL_NAMES[i] : endlessName(i); }
+export const isBossLevel = i => i === 2 || (i >= 3 && (i + 1) % 5 === 0);
+
+// ---------------------------------------------------------------- endless levels (level 4 onwards)
+// Built from chunks that stay inside the jump envelope (jump ≈138 high, super jump ≈478, running jump ≈315 far).
+// EVERY random choice is an integer (rng.int) and every coordinate is whole, so the Mac app (Float) and the
+// browser (double) build exactly the same level — they share online lobbies. Keep this in step with Levels.swift.
+const E_ADJ = ['Wobbly', 'Suspicious', 'Mildly Haunted', 'Extremely Beige', 'Slightly Sticky', 'Unreasonably Long', 'Very Serious', 'Crunchy',
+  'Forbidden', 'Soggy', 'Totally Normal', 'Emotional', 'Overcaffeinated', 'Sneaky', 'Lukewarm', 'Bouncy'];
+const E_PLACE = [['Backyard', 'Garden', 'Lawn', 'Hedge Maze', 'Vegetable Patch', 'Flowerbed'],
+  ['Desert', 'Dunes', 'Canyon', 'Mesa', 'Oasis', 'Tumbleweed Highway'],
+  ['Cube Corp Floor', 'Break Room', 'Server Room', 'Cubicle Farm', 'Mail Room', 'Stationery Cupboard']];
+const E_OF = ['of Destiny', 'of Doom', 'of Snacks', 'of Paperwork', 'of Mild Peril', 'of Lost Socks', 'of No Return', 'of Wet Floors', 'of Toast', '', '', ''];
+const E_QUIPS = ['Still going?\nRespect.', 'Level ${N}.\nThe toilets never end.', 'Beware of\nthe cube', 'Snacks ahead\n(probably)', 'Jump now,\nthink later',
+  "You're doing\namazing, jelly", 'This sign is\nload-bearing', 'Keep off\nthe grass', 'Warning:\nmild wobbling', 'Do not lick\nthe toaster'];
+const E_JUNK = ['duck', 'toast', 'melon', 'fish', 'sock', 'chicken', 'banana', 'cheese', 'bowling'];
+const E_THEME = i => i % 3;   // level 4 → backyard, 5 → desert, 6 → office, …
+function endlessName(i) {
+  const g = new RNG(7919 * i + 13);
+  const t = E_THEME(i), adj = E_ADJ[g.int(E_ADJ.length)], place = E_PLACE[t][g.int(E_PLACE[t].length)], of = E_OF[g.int(E_OF.length)];
+  if (isBossLevel(i)) return `${place}: The Cube Strikes Back`;
+  return `The ${adj} ${place}${t === 2 && place === 'Cube Corp Floor' ? ' ' + (i + 1) : ''}${of ? ' ' + of : ''}`;
+}
+function endless(i) {
+  const t = E_THEME(i), T = [THEMES.backyard, THEMES.desert, THEMES.office][t];
+  const L = new LevelData(T), g = new RNG(7919 * i + 13);
+  L.name = endlessName(i); L.subtitle = 'Level ' + (i + 1);
+  g.int(99); g.int(99); g.int(99);                                    // the three picks endlessName made
+  const n = i - 2, hard = Math.min(10, n);                             // 1…10 and then it stays that hard
+  const boss = isBossLevel(i), junk = () => E_JUNK[g.int(E_JUNK.length)];
+  let seed = 100 + i * 50;
+  const deco = (x0, x1, y) => L.deco(x0, x1, y, 120, seed++);
+  const foes = (x0, x1, y, count) => {
+    for (let k = 0; k < count; k++) {
+      const x = x0 + 60 + Math.floor((x1 - x0 - 120) * (k + 1) / (count + 1)) + 10 * g.int(7) - 30;
+      const r = g.int(10);
+      if (r < 2 + Math.floor(hard / 3)) L.enemy('toaster', x, y);
+      else if (r < 4 + Math.floor(hard / 3)) L.enemy('pigeon', x, y + 380 + 10 * g.int(5));
+      else L.enemy('cube', x, y);
+    }
+  };
+  // start: a safe runway
+  L.ground(-600, 900); deco(-500, 900, 0);
+  L.sign(`LEVEL ${i + 1}\n${E_QUIPS[g.int(E_QUIPS.length)].replace('${N}', String(i + 1))}`, 150);
+  L.row(junk(), 350, 90, 3 + g.int(3));
+  let x = 900, y = 0, lastCheck = 0, lastEye = 0;
+  const end = 6600 + 260 * Math.min(n, 20);
+  while (x < end) {
+    let k = g.int(12);
+    if (y >= 400 && (k === 5 || k === 7 || k === 8)) k = 9;            // high up: come back down instead of climbing more
+    if (y <= 0 && k === 9) k = 0;
+    const w = 600 + 50 * g.int(9);
+    if (x - lastCheck > 1500 && (k <= 1 || k === 5 || k === 7 || k === 8 || k === 10)) { L.check(x + 60, y); lastCheck = x; }
+    if (k <= 1) {                                                       // flat run with enemies and a snack row
+      L.ground(x, x + w, y); deco(x, x + w, y);
+      foes(x, x + w, y, 1 + g.int(1 + Math.ceil(hard / 3)));
+      L.row(junk(), x + 100, y + 90, 2 + g.int(4), 55);
+      x += w;
+    } else if (k === 2) {                                               // a gap to jump
+      const gap = 120 + 10 * g.int(4 + hard), dy = gap > 200 ? 10 * g.int(9) - 60 : 10 * g.int(15) - 80;
+      L.arc(junk(), x + 10, y + 110, 3, Math.floor(gap / 3), 50);
+      y = Math.max(0, y + dy); x += gap;
+      L.ground(x, x + w, y); deco(x, x + w, y);
+      if (g.int(2)) foes(x, x + w, y, 1);
+      x += w;
+    } else if (k === 3) {                                               // stepping-stone platforms over a pit
+      const pit = 600 + 20 * g.int(9);
+      L.plat(x + 120, y + 60, 160); L.plat(x + pit - 280, y + 100, 160);
+      L.row(junk(), x + 140, y + 130, 3, 45);
+      if (x - lastEye > 2500) { L.eye(x + pit - 200, y + 190); lastEye = x; }
+      x += pit; y = Math.max(0, y + 10 * g.int(9) - 40);
+      L.ground(x, x + w, y); deco(x, x + w, y); x += w;
+    } else if (k === 4) {                                               // moving platform over a pit
+      L.mover(x + 50, y + 20, 160, { dx: 110, speed: 1.1 + 0.05 * g.int(1 + hard) });
+      L.row(junk(), x + 100, y + 110, 2, 60);
+      x += 420; L.ground(x, x + w, y); deco(x, x + w, y); foes(x, x + w, y, g.int(2)); x += w;
+    } else if (k === 5 && y <= 300) {                                   // trampoline up to a bonus shelf
+      L.ground(x, x + 900, y); deco(x, x + 900, y);
+      L.tramp(x + 250, y + 14); L.plat(x + 370, y + 560, 320);
+      L.item(g.int(2) ? 'melon' : 'bowling', x + 450, y + 620); L.row(junk(), x + 500, y + 620, 3);
+      if (x - lastEye > 2000) { L.eye(x + 620, y + 630); lastEye = x; }
+      if (g.int(2)) L.enemy('pigeon', x + 700, y + 420);
+      x += 900;
+    } else if (k === 6) {                                               // fan up to a high ledge, then drop
+      L.fan(x + 20, x + 240, y - 700, y + 620, 3500);
+      L.plat(x + 270, y + 470, 480);
+      L.row(junk(), x + 330, y + 540, 4);
+      if (x - lastEye > 2000) { L.eye(x + 560, y + 560); lastEye = x; }
+      x += 750; L.ground(x, x + w, y); deco(x, x + w, y); x += w;
+    } else if (k === 7 && y <= 300) {                                   // lift up to high ground
+      L.ground(x, x + 800, y); deco(x, x + 600, y);
+      L.mover(x + 400, y + 190, 150, { dy: 190, speed: 1.1 });
+      y += 390; x += 600;
+      L.ground(x, x + w, y); deco(x, x + w, y); foes(x, x + w, y, 1 + g.int(2)); x += w;
+    } else if (k === 8 && y <= 400) {                                   // block stairs
+      L.ground(x, x + 850, y);
+      L.plat(x + 100, y + 100, 180, 100); L.plat(x + 350, y + 195, 180, 195); L.plat(x + 600, y + 290, 200, 290);
+      L.row(junk(), x + 380, y + 280, 2, 60);
+      y += 290; x += 800;
+      L.ground(x, x + w, y); deco(x, x + w, y); foes(x, x + w, y, g.int(2)); x += w;
+    } else if (k === 9) {                                               // ramp down
+      const y2 = Math.max(0, y - 150 - 50 * g.int(4));
+      L.ramp(x, x + 300, y, y2); y = y2; x += 300;
+      L.ground(x, x + w, y); deco(x, x + w, y); foes(x, x + w, y, 1); x += w;
+    } else if (k === 10) {                                              // slippery floor
+      L.ground(x, x + w, y, true);
+      foes(x, x + w, y, 1 + g.int(2));
+      L.row(junk(), x + 80, y + 90, 4 + g.int(4), 65);
+      x += w;
+    } else {                                                            // pigeon alley (and ramp up if we're low)
+      if (y === 0 && g.int(2)) { L.ramp(x, x + 300, 0, 150); y = 150; x += 300; }
+      L.ground(x, x + w, y); deco(x, x + w, y);
+      const np = 1 + g.int(1 + Math.ceil(hard / 4));
+      for (let p = 0; p < np; p++) L.enemy('pigeon', x + 150 + 200 * p, y + 380 + 10 * g.int(5));
+      L.row(junk(), x + 120, y + 90, 3, 60);
+      x += w;
+    }
+    if (g.int(6) === 0) L.sign(E_QUIPS[g.int(E_QUIPS.length)].replace('${N}', String(i + 1)), x - 200, y);
+  }
+  if (boss) {                                                           // the Mega Cube's arena, back down at ground level
+    if (y > 0) { L.ramp(x, x + 300, y, 0); x += 300; y = 0; }
+    L.ground(x, x + 2700); deco(x, x + 900, 0);
+    L.check(x + 120, 0);
+    L.row('melon', x + 250, 90, 2, 250); L.row('chicken', x + 500, 90, 3);
+    L.sign('MEGA CUBE\nis back. And angry.', x + 900);
+    L.bossTrigger = x + 1220;
+    L.enemy('boss', x + 1970, 0);
+    L.goal = new V3(x + 1870, 0, 0); L.goalHidden = true;
+    L.wall(x + 2700, x + 3000, 420);
+    L.maxX = x + 2700;
+  } else {                                                              // the golden toilet
+    L.ground(x, x + 1300, y); deco(x, x + 1300, y);
+    L.check(x + 120, y);
+    L.row('cheese', x + 300, y + 90, 2, 80);
+    L.goal = new V3(x + 1000, y, 0);
+    L.wall(x + 1300, x + 1600, y + 270);
+    L.maxX = x + 1300;
+  }
+  L.minX = -300;
+  return L;
+}
 
 function backyard() {
   const L = new LevelData(THEMES.backyard);

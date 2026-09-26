@@ -31,7 +31,7 @@ const broadcast = (L, obj, except) => { const m = JSON.stringify(obj); for (cons
 function publicList() {
   return [...lobbies.values()].filter(L => !L.priv).map(L => ({
     code: L.code, host: L.host?.name || '?', n: roster(L).length, max: MAX_SEATS,
-    level: L.level, levelName: LEVELS[L.level] || '', started: L.started,
+    level: L.level, levelName: LEVELS[L.level] || (L.level >= 3 ? `Level ${L.level + 1}` : ''), started: L.started,
   })).filter(x => x.n < MAX_SEATS).sort((a, b) => b.n - a.n).slice(0, 12);
 }
 
